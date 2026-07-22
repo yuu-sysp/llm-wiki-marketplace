@@ -1,0 +1,16 @@
+{
+  "name": "llm-wiki",
+  "displayName": "LLM Wiki",
+  "version": "0.1.0",
+  "description": "Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。自動蓄積フック・決定論的 lint・frontmatter からの index 自動生成・提案ワークフローを備える。",
+  "author": { "name": "yyasunobe" },
+  "keywords": ["wiki", "knowledge-base", "obsidian", "llm-wiki"],
+  "userConfig": {
+    "vault_root": {
+      "type": "directory",
+      "title": "LLM Wiki の保存先（vault ルート）",
+      "description": "Wiki 一式を置くフォルダ。例: D:/資料/LLM-Wiki または ~/Documents/LLM-Wiki",
+      "required": true
+    }
+  }
+}

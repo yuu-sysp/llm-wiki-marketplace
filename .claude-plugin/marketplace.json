@@ -1,0 +1,14 @@
+{
+  "name": "llm-wiki-marketplace",
+  "owner": { "name": "yyasunobe" },
+  "description": "ハイブリッド LLM Wiki プラグインの配布マーケットプレイス",
+  "plugins": [
+    {
+      "name": "llm-wiki",
+      "source": "./plugins/llm-wiki",
+      "description": "ハイブリッド LLM Wiki（自動蓄積・決定論lint・index自動生成・提案ワークフロー）",
+      "version": "0.1.0",
+      "author": { "name": "yyasunobe" }
+    }
+  ]
+}
