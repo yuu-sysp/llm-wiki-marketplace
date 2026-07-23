@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Wiki プラグイン — セットアップ資料</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1f2430; --muted:#5b6472; --line:#e3e7ee;
+    --card:#f7f9fc; --accent:#4c6ef5; --accent-weak:#eaf0ff;
+    --code-bg:#f4f6fa; --code-fg:#334; --th:#eef2f8;
+    --note:#eaf3ff; --note-bd:#4c6ef5; --warn:#fff5e9; --warn-bd:#e8912d;
+    --aim:#ecfaf3; --aim-bd:#25a06a;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1420; --fg:#e6e9ef; --muted:#9aa4b2; --line:#28303f;
+      --card:#161d2b; --accent:#7ea0ff; --accent-weak:#1a2338;
+      --code-bg:#141b28; --code-fg:#cdd6e5; --th:#1b2434;
+      --note:#152238; --note-bd:#5b7cff; --warn:#2c2413; --warn-bd:#d9922f;
+      --aim:#13271e; --aim-bd:#2fae74;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#ffffff; --fg:#1f2430; --muted:#5b6472; --line:#e3e7ee;
+    --card:#f7f9fc; --accent:#4c6ef5; --accent-weak:#eaf0ff;
+    --code-bg:#f4f6fa; --code-fg:#334; --th:#eef2f8;
+    --note:#eaf3ff; --note-bd:#4c6ef5; --warn:#fff5e9; --warn-bd:#e8912d;
+    --aim:#ecfaf3; --aim-bd:#25a06a;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1420; --fg:#e6e9ef; --muted:#9aa4b2; --line:#28303f;
+    --card:#161d2b; --accent:#7ea0ff; --accent-weak:#1a2338;
+    --code-bg:#141b28; --code-fg:#cdd6e5; --th:#1b2434;
+    --note:#152238; --note-bd:#5b7cff; --warn:#2c2413; --warn-bd:#d9922f;
+    --aim:#13271e; --aim-bd:#2fae74;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:2.5rem 1.25rem 4rem}
+  header.hero{border-bottom:1px solid var(--line); padding-bottom:1.4rem; margin-bottom:1.6rem}
+  header.hero h1{font-size:1.9rem; margin:0 0 .35rem; line-height:1.3}
+  header.hero p{margin:.2rem 0; color:var(--muted)}
+  .flow{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.7rem}
+  .flow span{background:var(--accent-weak); color:var(--accent); border:1px solid var(--line);
+    padding:.2rem .7rem; border-radius:999px; font-size:.8rem; font-weight:600}
+  .flow i{color:var(--muted); font-style:normal; align-self:center}
+  nav.toc{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem 1.25rem; margin:1.6rem 0 2.2rem}
+  nav.toc strong{display:block; font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:.5rem}
+  nav.toc ol{margin:0; padding-left:1.3rem}
+  nav.toc > ol{columns:2; column-gap:2rem}
+  @media(max-width:640px){nav.toc > ol{columns:1}}
+  nav.toc ol ol{columns:1; padding-left:1.1rem; margin:.2rem 0 .4rem; font-size:.9rem; color:var(--muted)}
+  nav.toc a{color:var(--fg); text-decoration:none}
+  nav.toc ol ol a{color:var(--muted)}
+  nav.toc a:hover{color:var(--accent); text-decoration:underline}
+  h2{font-size:1.4rem; margin:2.8rem 0 .9rem; padding:.15rem 0 .15rem .7rem; border-left:5px solid var(--accent); line-height:1.35}
+  h3{font-size:1.08rem; margin:1.7rem 0 .5rem}
+  p{margin:.6rem 0}
+  ul,ol{padding-left:1.4rem}
+  li{margin:.3rem 0}
+  a{color:var(--accent)}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; font-size:.86em;
+    background:var(--code-bg); color:var(--code-fg); padding:.12em .4em; border-radius:5px}
+  pre{background:var(--code-bg); color:var(--code-fg); padding:1rem 1.1rem; border-radius:10px;
+    overflow-x:auto; border:1px solid var(--line); font-size:.86rem; line-height:1.6}
+  pre code{background:none; padding:0; font-size:inherit}
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:1rem 0}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:.92rem}
+  th,td{text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:var(--th); font-weight:650; white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .callout{border-left:4px solid var(--note-bd); background:var(--note); border-radius:0 10px 10px 0;
+    padding:.8rem 1rem; margin:1.1rem 0}
+  .callout.warn{border-left-color:var(--warn-bd); background:var(--warn)}
+  .callout.aim{border-left-color:var(--aim-bd); background:var(--aim)}
+  .callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+  .callout .tag{font-weight:700; font-size:.8rem; letter-spacing:.03em; display:block; margin-bottom:.3rem}
+  .diagram{font-size:.8rem; line-height:1.45}
+  hr{border:none; border-top:1px solid var(--line); margin:2.5rem 0}
+  footer{margin-top:3rem; padding-top:1.2rem; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem}
+  .theme-btn{position:fixed; top:1rem; right:1rem; background:var(--card); color:var(--fg);
+    border:1px solid var(--line); border-radius:999px; padding:.4rem .8rem; font-size:.8rem; cursor:pointer}
+  .lead{color:var(--muted); font-size:1.02rem}
+  .part-note{color:var(--muted); font-size:.92rem; margin:.2rem 0 .6rem}
+</style>
+</head>
+<body>
+<button class="theme-btn" onclick="(function(){var r=document.documentElement;var d=(r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));r.setAttribute('data-theme', d==='dark'?'light':'dark');})()">◐ テーマ</button>
+<div class="wrap">
+
+<header class="hero">
+  <h1>LLM Wiki プラグイン — セットアップ資料</h1>
+  <p class="lead">Claude Code で「調べたこと・エラー原因・設計判断」を自動で貯め、Obsidian で読める Wiki に育てる仕組み。</p>
+  <div class="flow">
+    <span>① ねらい</span><i>→</i><span>② PC導入</span><i>→</i><span>③ 解説</span><i>→</i><span>④ 全社展開</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong>目次</strong>
+  <ol>
+    <li><a href="#aim">ねらい（なぜ作ったか）</a></li>
+    <li><a href="#install">PC導入（新規PCに入れる）</a>
+      <ol>
+        <li><a href="#install-pre">前提</a></li>
+        <li><a href="#install-public">public リポジトリ</a></li>
+        <li><a href="#install-private">private リポジトリ（Windows）</a></li>
+        <li><a href="#install-bat">インストーラ一括</a></li>
+        <li><a href="#install-py">Python 自動インストール</a></li>
+        <li><a href="#install-desktop">デスクトップアプリだけの場合</a></li>
+      </ol>
+    </li>
+    <li><a href="#detail">解説（仕組みと使い方）</a>
+      <ol>
+        <li><a href="#d-arch">全体構成</a></li>
+        <li><a href="#d-config">設定項目</a></li>
+        <li><a href="#d-usage">日常の使い方</a></li>
+        <li><a href="#d-publish">更新・発行</a></li>
+        <li><a href="#d-trouble">注意点・トラブルシュート</a></li>
+      </ol>
+    </li>
+    <li><a href="#enterprise">全社展開</a></li>
+  </ol>
+</nav>
+
+<!-- ① ねらい -->
+<h2 id="aim">① ねらい（なぜ作ったか）</h2>
+
+<h3>解決したい課題</h3>
+<ul>
+  <li>調べた知見・ハマりどころが<strong>セッションごとに消える</strong>。同じことを何度も調べ直す。</li>
+  <li>手書きの索引は<strong>すぐ陳腐化</strong>する（リンク切れ・記載漏れ）。</li>
+  <li>知識の仕組みが特定PCに<strong>ハードコード</strong>され、新しいPCへ持ち運べない。</li>
+</ul>
+
+<h3>設計思想 — 2つの流儀のハイブリッド</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>取り込んだ強み</th><th>由来</th></tr></thead>
+  <tbody>
+    <tr><td>作業中に<strong>自動で</strong>知見を貯める（動詞を叩かなくても溜まる）</td><td>現行運用</td></tr>
+    <tr><td><strong>決定論的な lint</strong>（機械的に確実に壊れを検出、CIで使える）</td><td>現行運用</td></tr>
+    <tr><td>type別フォルダ（concepts/notes/pages）の明快さ</td><td>現行運用</td></tr>
+    <tr><td><strong>index を frontmatter から自動生成</strong>（手書きドリフトを根治）</td><td>ハイブリッド</td></tr>
+    <tr><td><strong>冪等な取り込み</strong>（Phase A/B＋<code>type:source</code>完了マーカーで壊れない）</td><td>Karpathy/TAAT流</td></tr>
+    <tr><td><strong>提案ワークフロー</strong>（AIの変更提案を人間が検収）※設計のみ</td><td>Karpathy/TAAT流</td></tr>
+    <tr><td>vault パスの<strong>外部化</strong>（userConfig）で新規PCへ可搬</td><td>ハイブリッド</td></tr>
+  </tbody>
+</table></div>
+
+<div class="callout aim">
+  <span class="tag">■ 何が嬉しいか</span>
+  <p>Claude Code で普通に開発するだけで知見が <code>inbox/</code> に溜まり、Wiki ページへ整理できる。<code>lint</code> でいつでも「壊れゼロ」を機械保証し、<code>index</code> は常に最新。プラグイン＋インストーラなので、新規PCでも数コマンドで同じ環境が立ち上がる。</p>
+</div>
+
+<!-- ② PC導入 -->
+<h2 id="install">② PC導入（新規PCに入れる）</h2>
+<p class="part-note">まず自分のPCで動かす手順。public / private / インストーラの3経路。</p>
+
+<h3 id="install-pre">2.1 前提</h3>
+<ul>
+  <li><strong>Python 3</strong> が PATH にある（scripts が Python）。無い場合はインストーラの <code>-InstallPython</code> で自動導入可（2.5）</li>
+  <li><strong>Claude Code</strong>：CLI か <strong>デスクトップアプリ</strong>のどちらか。プラグイン登録に必要（登録方法は 2.2〜2.6）</li>
+  <li>（private リポジトリから入れる場合）GitHub 認証</li>
+</ul>
+
+<h3 id="install-public">2.2 public リポジトリの場合（最短）</h3>
+<p>Claude Code（CLI・デスクトップどちらでも）で：</p>
+<pre><code>/plugin marketplace add yuu-sysp/llm-wiki-marketplace
+/plugin install llm-wiki@llm-wiki-marketplace</code></pre>
+<p>インストール時に <strong>vault 保存先</strong>を尋ねられる。初回セッションの SessionStart フックがフォルダ構成を自動生成。</p>
+
+<h3 id="install-private">2.3 private リポジトリの場合（Windows）</h3>
+<p><code>owner/repo</code> 短縮形は既定で SSH クローンになるため、HTTPS を使うなら<strong>フルURL</strong>で指定する。</p>
+<pre><code>winget install GitHub.cli          # 未導入なら
+gh auth login                      # 一度だけ（対話ログイン）
+gh auth setup-git                  # git 認証ヘルパー設定
+claude plugin marketplace add https://github.com/yuu-sysp/llm-wiki-marketplace.git
+claude plugin install llm-wiki@llm-wiki-marketplace --config vault_root="D:\資料\LLM-Wiki"</code></pre>
+<p>SSH運用なら <code>git@github.com:yuu-sysp/llm-wiki-marketplace.git</code> を使う（<code>gh</code> 不要）。</p>
+
+<h3 id="install-bat">2.4 インストーラでフォルダ生成まで一括</h3>
+<pre><code>git clone https://github.com/yuu-sysp/llm-wiki-marketplace.git
+cd llm-wiki-marketplace
+.\install.bat -VaultRoot "D:\資料\LLM-Wiki"</code></pre>
+<p>Python 検出 → プラグイン登録（claude CLI があれば）→ vault 生成 → 初期 lint まで実行。
+CLI が無ければフォルダ生成まで行い、<strong>デスクトップアプリでの登録手順を表示</strong>する（2.6）。</p>
+
+<h3 id="install-py">2.5 Python が無い場合の自動インストール</h3>
+<p>インストーラに <code>-InstallPython</code> を付けると、Python が無いとき自動導入する。<strong>PATH 登録も自動</strong>で、
+導入直後の同じシェルで使えるよう PATH を再読込するため、ユーザーは環境変数を触らなくてよい。</p>
+<pre><code>.\install.bat -VaultRoot "D:\資料\LLM-Wiki" -InstallPython</code></pre>
+<ul>
+  <li>導入方式: <strong>winget</strong>（<code>Python.Python.3.12</code>、ユーザースコープ・管理者権限不要）→ 失敗時 <strong>python.org 公式インストーラ</strong>（<code>/quiet PrependPath=1</code>）にフォールバック</li>
+  <li><code>python</code> と <code>py</code> の両ランチャーを検出。既に Python 3 があればそれを使う（自動導入しない）</li>
+</ul>
+
+<h3 id="install-desktop">2.6 デスクトップアプリだけの場合（CLI不要でGUI登録）</h3>
+<p>CLI が無くても、デスクトップアプリの GUI でプラグイン登録できる（アプリは CLI と同じ <code>~/.claude</code> を読む）。</p>
+<ol>
+  <li>プロンプト横の <strong>[＋] → Plugins</strong>（または chat に <code>/plugin</code> と入力）</li>
+  <li><strong>Marketplaces タブ → Add marketplace</strong> → URL を貼付:<br><code>https://github.com/yuu-sysp/llm-wiki-marketplace.git</code></li>
+  <li><strong>Discover タブ</strong> → <code>llm-wiki</code> を選び <strong>Install</strong> → スコープ <strong>User</strong> → <code>vault_root</code> に保存先を入力 → <strong>Confirm</strong></li>
+  <li><code>/reload-plugins</code> でリロード（<code>/llm-wiki:init</code> 等が <code>/</code> メニューに出れば成功）</li>
+</ol>
+<p>CLI も入れたい場合（依存なし・自動更新・管理者権限不要）:</p>
+<pre><code>irm https://claude.ai/install.ps1 | iex</code></pre>
+
+<!-- ③ 解説 -->
+<h2 id="detail">③ 解説（仕組みと使い方）</h2>
+<p class="part-note">中で何が動いているか、どう使い、どう保つか。</p>
+
+<h3 id="d-arch">3.1 全体構成</h3>
+<pre class="diagram"><code>[Claude Code + プラグイン]                 [vault（あなたの知識・Obsidianで開く）]
+  skills  init/save/ingest/query/lint   ──▶  concepts/ notes/ pages/ qa/
+  hooks   SessionStart=bootstrap             inbox/  … 自動蓄積の受け皿
+          Stop=save_learnings                sources/… 生ログ保全
+  scripts lint.py / index.py /               meta/   … index.md(自動生成) log rules
+          bootstrap.py / save_learnings.py           lint-ignore.txt template
+                                             _proposals/ … 提案(将来)
+        userConfig: vault_root ───────────────┘（このパスで両者が結びつく）</code></pre>
+
+<div class="tablewrap"><table>
+  <thead><tr><th>コンポーネント</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td>skill <code>init</code></td><td>vault の足場を生成（bootstrap 呼出）</td></tr>
+    <tr><td>skill <code>save</code></td><td>直前の会話の知見をページ化</td></tr>
+    <tr><td>skill <code>ingest</code></td><td>inbox の取り込み（Phase A/B・完了マーカー）</td></tr>
+    <tr><td>skill <code>query</code></td><td>Wiki を段階検索して出典付き回答</td></tr>
+    <tr><td>skill <code>lint</code></td><td>健全性検査＋index 再生成</td></tr>
+    <tr><td>hook SessionStart</td><td><code>bootstrap.py</code>：フォルダ構成を冪等生成</td></tr>
+    <tr><td>hook Stop</td><td><code>save_learnings.py</code>：当日足場を用意＋過去日の空スタブ掃除</td></tr>
+    <tr><td>script <code>lint.py</code></td><td>赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code）</td></tr>
+    <tr><td>script <code>index.py</code></td><td>各ページ frontmatter から index.md を自動生成</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="d-config">3.2 設定項目</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>項目</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>vault_root</code>（userConfig）</td><td>Wiki 一式の保存先。インストール時に設定。スクリプトへは環境変数 <code>CLAUDE_PLUGIN_OPTION_VAULT_ROOT</code> として渡る</td></tr>
+    <tr><td><code>LLM_WIKI_VAULT_ROOT</code>（環境変数）</td><td>スタンドアロンで scripts を叩く時のフォールバック（install.ps1 が <code>setx</code> で設定）</td></tr>
+    <tr><td>hooks</td><td>SessionStart=bootstrap / Stop=save_learnings（<code>plugins/llm-wiki/hooks/hooks.json</code>）</td></tr>
+    <tr><td><code>meta/lint-ignore.txt</code></td><td>意図的に残す赤リンク（将来ページ化予定）を1行1件で許容</td></tr>
+  </tbody>
+</table></div>
+<p>スクリプト単体実行：</p>
+<pre><code>python plugins/llm-wiki/scripts/bootstrap.py "D:/資料/LLM-Wiki"
+python plugins/llm-wiki/scripts/lint.py       "D:/資料/LLM-Wiki"
+python plugins/llm-wiki/scripts/index.py      "D:/資料/LLM-Wiki"</code></pre>
+
+<h3 id="d-usage">3.3 日常の使い方</h3>
+<ul>
+  <li>普通に開発する → Stopフックが <code>inbox/{日付}-{PJ}.md</code> に足場を用意（知見はここに追記されていく）</li>
+  <li><code>/llm-wiki:save</code> … 会話の知見を concepts/notes/pages へ整理</li>
+  <li><code>/llm-wiki:ingest</code> … inbox をまとめてページ化（Phase A/B）</li>
+  <li><code>/llm-wiki:query</code> … Wiki を検索して回答</li>
+  <li><code>/llm-wiki:lint</code> … 壊れチェック＋index 再生成（変更後は必ず）</li>
+</ul>
+<p>frontmatter（全ページ）：</p>
+<pre><code>---
+type: concept | note | page | synthesis | source
+genre: &lt;ジャンル&gt;        # index のグルーピングキー
+summary: "1行要約"        # index にそのまま出る
+tags: []
+related: ["[[関連]]"]
+source: "PJ名/ファイル or URL"
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+---</code></pre>
+
+<h3 id="d-publish">3.4 更新・発行</h3>
+<ul>
+  <li>プラグインを直したら（開発PC）：<code>.\publish.bat "変更内容"</code> → GitHub へ push</li>
+  <li>各ユーザー側の更新：<code>/plugin marketplace update llm-wiki-marketplace</code></li>
+</ul>
+
+<h3 id="d-trouble">3.5 注意点・トラブルシュート</h3>
+<div class="tablewrap"><table>
+  <thead><tr><th>症状</th><th>原因・対処</th></tr></thead>
+  <tbody>
+    <tr><td><code>.bat</code> が「指定されたファイルが見つかりません」</td><td>.bat は <strong>ASCII＋CRLF</strong> 必須。UTF-8/LF だと cmd.exe が誤動作</td></tr>
+    <tr><td>プラグインが <code>failed to load: Duplicate hooks</code></td><td>plugin.json に <code>hooks</code>/<code>skills</code> を書かない（標準dirが自動ロード）</td></tr>
+    <tr><td>同じ inbox に空スタブが二重生成</td><td>旧 global Stopフック（<code>~/.claude/hooks/save_learnings.py</code>）を settings.json から外す</td></tr>
+    <tr><td>Python 導入直後に <code>python</code> が見つからない</td><td>新しいシェルを開くか、<code>-InstallPython</code> 経由なら同一セッションで PATH 再読込済み</td></tr>
+    <tr><td>private repo で <code>marketplace add</code> 失敗</td><td>各PCで <code>gh auth login</code>＋<code>gh auth setup-git</code>、HTTPSはフルURL指定</td></tr>
+    <tr><td>private + HTTPS で自動更新されない</td><td>背景更新は認証が効かない。手動 <code>marketplace update</code>／SSH運用／<code>CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1</code></td></tr>
+    <tr><td>lint が当日 inbox スタブを挙げる</td><td>「想定内」区分で失敗に数えない。翌日フックが自動掃除</td></tr>
+  </tbody>
+</table></div>
+
+<!-- ④ 全社展開 -->
+<h2 id="enterprise">④ 全社展開</h2>
+<div class="callout">
+  <span class="tag">前提</span>
+  <p>LLM Wiki は<strong>ファイルベース</strong>（DB もサーバーデーモンも持たない）。「全社でサーバー運用」は目的によって手段が4つに分かれる。</p>
+</div>
+
+<h3>① プラグインの配布を全社化 — 一番簡単</h3>
+<p>社内 <strong>GitHub Enterprise / 社内Git</strong> に marketplace を置けば、全員が同じ仕組みを入れられる。「サーバーに置く」の最小形。</p>
+<pre><code>/plugin marketplace add &lt;社内&gt;/llm-wiki-marketplace
+/plugin install llm-wiki@llm-wiki-marketplace</code></pre>
+
+<h3>② 共有ナレッジベース化（みんなで1つのWikiを育てる） — 現実解あり</h3>
+<p>vault 自体を <strong>git 管理の中央リポジトリ</strong>にして共有するのが定石（Obsidian Git 方式）。</p>
+<ul>
+  <li>各自の <code>vault_root</code> を自分のクローンに向ける → 書いたら commit/push、朝 pull</li>
+  <li>サーバー側（社内Git）が正本を保持</li>
+  <li><strong>同時編集はマージ運用</strong>。リアルタイム多人数同時書き込みには非対応（ファイルなので競合する）</li>
+  <li>本プラグインの <strong>lint・index自動生成・<code>type:source</code>完了マーカー</strong>が競合と破損をかなり減らす</li>
+</ul>
+<p>代替：ネットワーク共有(SMB)や OneDrive/SharePoint 同期でも可能だが、同時書き込みで上書き事故が起きやすいため <strong>git 推奨</strong>。</p>
+
+<h3>③ サーバー側で無人自動化 — 可能</h3>
+<p><code>lint.py</code> / <code>index.py</code> / <code>bootstrap.py</code> は<strong>素のPython</strong>なので、サーバーの cron / CI で回せる（Claude Code 不要）。</p>
+<ul>
+  <li>夜間に index 再生成・健全性チェック（壊れたら Slack 通知等）</li>
+  <li>vault を静的サイト化して社内ブラウザ閲覧に公開</li>
+  <li>さらに踏み込むなら <strong>headless の <code>claude -p</code></strong> をサーバーで定期実行し、inbox の ingest や curiosity（休眠ページの自己点検）を無人で回す構成も可能（※各実行がAPI/サブスクを消費、サーバー側のClaude認証が必要）</li>
+</ul>
+
+<h3>④ ホスト型 Wiki サービス（ACL・全文検索・同時編集） — 素ではムリ</h3>
+<p>Confluence のような多人数同時・権限管理・検索付きの Web サービスとしては、そのままでは動かない。要件なら vault の上に <strong>Webビューア or DB化レイヤー</strong>を別途載せる別プロジェクトになる。</p>
+
+<div class="callout warn">
+  <span class="tag">⚠ 全社運用で必須のガバナンス設計</span>
+  <ul>
+    <li><strong>個人vault と 共有vault を分ける</strong>（全員の生の学びがそのまま全社に見えるのは危険）。個人inbox → 選別して共有へ、が安全。</li>
+    <li><strong>秘密情報の混入防止</strong>：自動蓄積フックがパスワード・接続文字列等を共有vaultに載せないルール／フィルタ。</li>
+    <li><strong>粒度と重複</strong>：全社だと同義ページが乱立しやすい。lint の孤立・弱関連検出や（将来の）curiosity で統制。</li>
+  </ul>
+</div>
+
+<h3>現実的なおすすめ構成（全社なら）</h3>
+<ol>
+  <li><strong>配布</strong>：社内Gitに marketplace（①）</li>
+  <li><strong>共有vault</strong>：git-backed の中央リポ、各自クローン、個人vaultと分離（②）</li>
+  <li><strong>サーバー自動化</strong>：CIで nightly の index再生成＋lint＋静的サイト公開（③）</li>
+  <li>④のホスト型が欲しくなったら、その時に別レイヤーを検討</li>
+</ol>
+<div class="callout aim">
+  <span class="tag">結論</span>
+  <p>配布と自動化はサーバーで全社化できる。共有ナレッジ化も git 運用なら実用的。ただし<strong>リアルタイム多人数のホスト型Wikiサービスではない</strong>。</p>
+</div>
+
+<footer>
+  LLM Wiki プラグイン セットアップ資料 / repo: <code>yuu-sysp/llm-wiki-marketplace</code> — 構成: ねらい → PC導入 → 解説 → 全社展開。<code>docs/setup-guide.md</code> と同内容＋全社展開の構成を統合。
+</footer>
+
+</div>
+</body>
+</html>
