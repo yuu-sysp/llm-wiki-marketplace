@@ -1,0 +1,9 @@
+# 改行コードの固定。
+# .ps1 / .bat は Windows で cmd から起動するため CRLF に固定する。
+# ※ install.ps1 は「UTF-8 with BOM」で保存すること（Windows PowerShell 5.1 が
+#    cmd/.bat 経由で cp932 と誤読し日本語が化けるのを防ぐ）。BOM はコミット済みの
+#    バイト列としてそのまま保持される。編集時に BOM を落とさないよう注意。
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.py  text eol=lf
+*.md  text

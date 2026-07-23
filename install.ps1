@@ -1,4 +1,4 @@
-<#
+﻿<#
   LLM Wiki 導入インストーラ（新規PC用 / Windows）
 
   やること:
@@ -21,6 +21,14 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# 日本語出力の文字化け対策: コンソール入出力を UTF-8 に固定する。
+# （このファイル自体は UTF-8 with BOM で保存し、Windows PowerShell 5.1 が
+#   cmd/.bat 経由で cp932 と誤読するのを防ぐ。手動の文字コード変換は不要。）
+try {
+  $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+} catch {}
 $RepoRoot = $PSScriptRoot
 if (-not $Marketplace) { $Marketplace = $RepoRoot }          # 既定はこのリポジトリ自身（ローカル）
 if (-not $VaultRoot)   { $VaultRoot = Join-Path $HOME "Documents\LLM-Wiki" }
