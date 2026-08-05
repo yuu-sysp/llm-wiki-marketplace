@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import resolve_vault  # noqa: E402
+from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -52,7 +52,7 @@ def parse_frontmatter(text: str) -> dict:
 def main() -> int:
     vault = resolve_vault()
     if vault is None:
-        print("ERROR: vault ルートを指定してください。")
+        print_unresolved_hint("index.py")
         return 2
     if not vault.is_dir():
         print(f"ERROR: vault が存在しません: {vault}")

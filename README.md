@@ -25,9 +25,16 @@ publish.bat  "初版"
 ```
 git clone https://github.com/<you>/llm-wiki-marketplace.git
 cd llm-wiki-marketplace
-install.bat -VaultRoot "D:\資料\LLM-Wiki"
+install.bat                                # 保存先はフォルダ選択ダイアログで指定
+install.bat -VaultRoot "D:\資料\LLM-Wiki"  # パスを直接指定する場合
 ```
 インストーラが Python チェック → プラグイン登録（claude CLI があれば）→ vault のフォルダ構成生成 → 初期 lint まで実行する。
+
+`-VaultRoot` 省略時は**エクスプローラー風のフォルダ選択ダイアログ**が開く（ダブルクリック起動でも同じ）。
+D: 等の別ドライブも選べ、選んだフォルダ直下に `LLM-Wiki` を作る。無人実行は `-NoPrompt`（既定 `~\Documents\LLM-Wiki`）。
+
+インストール後は **Claude Code を完全終了して再起動**すること（起動済みセッションには vault_root が反映されない）。
+詳細は `docs/setup-guide.md` の 2.4 / 2.7 / 2.8 を参照。
 
 ### 方法B: Claude Code 内から
 

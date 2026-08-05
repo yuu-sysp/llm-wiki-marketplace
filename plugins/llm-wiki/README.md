@@ -13,9 +13,22 @@ Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。現行運用�
 | script | `scripts/lint.py` | 決定論的 lint（赤リンク/孤立/空/frontmatter/inbox） |
 | script | `scripts/index.py` | frontmatter から index.md 自動生成（ドリフト根治） |
 | script | `scripts/bootstrap.py` | vault フォルダ構成＋meta雛形の冪等生成 |
+| script | `scripts/convert_inbox.py` | inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は `sources/_attachments/` へ退避） |
 | script | `scripts/save_learnings.py` | Stop フック本体 |
 | script | `scripts/_vault.py` | vault ルート解決（引数→環境変数） |
 | template | `templates/` | ページ・meta の雛形 |
+
+## 依存
+
+lint / index / bootstrap / save_learnings は**標準ライブラリのみ**で動く（CI・cron で回せる）。
+`convert_inbox.py` だけ、Office/PDF を扱うときに次を使う（未導入なら該当ファイルをスキップして続行）。
+
+```
+pip install python-docx openpyxl python-pptx pypdf
+```
+
+txt / csv / tsv / html / json は追加ライブラリ無しで変換できる。
+PDF は pypdf が無くても、ingest 時に Claude の Read ツールが直接読める。
 
 ## vault ルートの解決
 
@@ -25,9 +38,10 @@ Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。現行運用�
 ## スクリプト単体実行
 
 ```
-python scripts/bootstrap.py "D:/資料/LLM-Wiki"
-python scripts/lint.py       "D:/資料/LLM-Wiki"
-python scripts/index.py      "D:/資料/LLM-Wiki"
+python scripts/bootstrap.py     "D:/資料/LLM-Wiki"
+python scripts/convert_inbox.py "D:/資料/LLM-Wiki"
+python scripts/lint.py          "D:/資料/LLM-Wiki"
+python scripts/index.py         "D:/資料/LLM-Wiki"
 ```
 
 ## 設計メモ

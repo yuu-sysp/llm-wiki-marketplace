@@ -13,8 +13,9 @@
 | `notes/`    | 設計判断メモ（なぜAでなくBか。Why とトレードオフを書く） |
 | `pages/`    | 画面・人・プロジェクト・組織 |
 | `qa/`       | Q&Aアーカイブ（任意。再利用価値が高いときのみ） |
-| `inbox/`    | 未処理ソースの投入口（処理後 sources/ へ移動、または削除） |
+| `inbox/`    | 未処理ソースの投入口（処理後 sources/ へ移動、または削除）。pptx/xlsx/docx/pdf 等も置ける（`convert_inbox.py` が md 化する） |
 | `sources/`  | 取り込み済みの生ソース（原文保持・改変禁止） |
+| `sources/_attachments/` | 変換元のバイナリ原本（pptx/xlsx/pdf 等）。md からは `` `sources/_attachments/<名前>` `` と backtick で参照する（`[[ ]]` にすると赤リンクになる） |
 | `meta/`     | index.md / log.md / rules.md / lint-ignore.txt / テンプレート |
 | `_proposals/` | lint/curiosity の修正提案（pending → applied/rejected） |
 

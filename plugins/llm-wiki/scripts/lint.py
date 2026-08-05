@@ -8,6 +8,7 @@
   3. 空ファイル     : 0byte の .md
   4. frontmatter欠落: 先頭が --- でない / 必須キー欠落
   5. inbox残存/空スタブ: 未処理ファイル・中身なしスタブ（当日は想定内）
+  6. inbox未変換    : 非 md ファイル（convert_inbox.py 待ち。ingest は *.md しか見ない）
 
 vault ルートは argv[1] → 環境変数の順で解決（_vault.resolve_vault）。
   例: python lint.py "D:/資料/LLM-Wiki"
@@ -19,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import resolve_vault  # noqa: E402
+from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
@@ -72,8 +73,7 @@ def is_stub(text: str) -> bool:
 def main() -> int:
     root = resolve_vault()
     if root is None:
-        print("ERROR: vault ルートを解決できません。"
-              "引数 or CLAUDE_PLUGIN_OPTION_VAULT_ROOT / LLM_WIKI_VAULT_ROOT を指定してください。")
+        print_unresolved_hint("lint.py")
         return 2
     if not root.is_dir():
         print(f"ERROR: vault が存在しません: {root}")
@@ -138,6 +138,12 @@ def main() -> int:
     inbox = root / "inbox"
     inbox_files = sorted(inbox.glob("*.md")) if inbox.is_dir() else []
 
+    # ingest が見るのは *.md だけなので、非 md は放置すると黙って取り込まれない。
+    # convert_inbox.py に渡すべき残骸として明示的に検出する。
+    inbox_raw = sorted(p.name for p in inbox.iterdir()
+                       if p.is_file() and p.suffix.lower() != ".md"
+                       and not p.name.startswith(".")) if inbox.is_dir() else []
+
     def _is_stub(f):
         return f.stat().st_size == 0 or is_stub(read(f))
 
@@ -165,12 +171,13 @@ def main() -> int:
     section("孤立ページ（被リンクなし）", orphans, str)
     section("空ファイル(0byte)", empties, str)
     section("frontmatter 問題", fm_bad, lambda x: f"{x[0]}  … {x[1]}")
+    section("inbox 未変換ファイル（非md・convert_inbox.py を実行）", inbox_raw, str)
     section("inbox 未処理（中身あり）", inbox_real, str)
     section("inbox 空スタブ・過去日（要対応）", inbox_stub_old, str)
     section("inbox 空スタブ・当日（想定内・Stopフックが翌日掃除）", inbox_stub_today, str)
 
     total = (len(broken) + len(orphans) + len(empties)
-             + len(fm_bad) + len(inbox_real) + len(inbox_stub_old))
+             + len(fm_bad) + len(inbox_real) + len(inbox_stub_old) + len(inbox_raw))
     print("\n" + "=" * 60)
     print("OK: 問題は見つかりませんでした ✔" if total == 0
           else f"検出合計: {total} 件 — 上記を修正してください")

@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import resolve_vault  # noqa: E402
+from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -25,7 +25,9 @@ except Exception:
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 TODAY = datetime.now().strftime("%Y-%m-%d")
 
-DIRS = ["concepts", "notes", "pages", "qa", "inbox", "sources", "meta", "_proposals"]
+DIRS = ["concepts", "notes", "pages", "qa", "inbox", "sources",
+        "sources/_attachments",                 # convert_inbox.py が退避する原本置き場
+        "meta", "_proposals"]
 
 # (テンプレファイル名, vault内の配置先相対パス)
 SEEDS = [
@@ -45,7 +47,7 @@ def render(text: str) -> str:
 def main() -> int:
     vault = resolve_vault()
     if vault is None:
-        print("ERROR: vault ルートを指定してください（引数 or LLM_WIKI_VAULT_ROOT）。")
+        print_unresolved_hint("bootstrap.py")
         return 2
 
     created, skipped = [], []

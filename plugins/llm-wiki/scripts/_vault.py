@@ -21,3 +21,18 @@ def resolve_vault(argv_index: int = 1):
         if v and v.strip():
             return Path(v).expanduser()
     return None
+
+
+def print_unresolved_hint(script: str = "スクリプト") -> None:
+    """vault 未解決時の対処を出し切る.
+
+    実運用で詰まる原因はほぼ 2 つ（userConfig が空 / Claude Code を再起動していない）。
+    ここで案内しないとユーザーは「Vault が未設定」とだけ見えて手が止まる。
+    """
+    print("ERROR: vault ルートが解決できません（引数・userConfig・環境変数すべて空）。")
+    print("  対処 1: Claude Code で /plugin → llm-wiki の vault_root に保存先を設定 → /reload-plugins")
+    print("          CLI なら: claude plugin install llm-wiki@llm-wiki-marketplace "
+          '--config "vault_root=<path>"')
+    print("  対処 2: 設定済みなら Claude Code を完全終了して再起動")
+    print("          （起動中のセッションには userConfig も環境変数も反映されない）")
+    print(f'  対処 3: 単発実行なら引数で明示 : python {script} "<vault path>"')

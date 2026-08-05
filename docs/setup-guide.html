@@ -108,12 +108,15 @@
     <li><a href="#aim">ねらい（なぜ作ったか）</a></li>
     <li><a href="#install">PC導入（新規PCに入れる）</a>
       <ol>
+        <li><a href="#install-quick">⚡ 最短手順</a></li>
         <li><a href="#install-pre">前提</a></li>
         <li><a href="#install-public">public リポジトリ</a></li>
         <li><a href="#install-private">private リポジトリ（Windows）</a></li>
         <li><a href="#install-bat">インストーラ一括</a></li>
         <li><a href="#install-py">Python 自動インストール</a></li>
         <li><a href="#install-desktop">デスクトップアプリだけの場合</a></li>
+        <li><a href="#install-vault">vault の保存先（Dドライブ不要）</a></li>
+        <li><a href="#install-restart">インストール後は再起動（重要）</a></li>
       </ol>
     </li>
     <li><a href="#detail">解説（仕組みと使い方）</a>
@@ -121,6 +124,7 @@
         <li><a href="#d-arch">全体構成</a></li>
         <li><a href="#d-config">設定項目</a></li>
         <li><a href="#d-usage">日常の使い方</a></li>
+        <li><a href="#d-ingest">既存資料の Wiki 化</a></li>
         <li><a href="#d-publish">更新・発行</a></li>
         <li><a href="#d-trouble">注意点・トラブルシュート</a></li>
       </ol>
@@ -162,11 +166,25 @@
 <h2 id="install">② PC導入（新規PCに入れる）</h2>
 <p class="part-note">まず自分のPCで動かす手順。public / private / インストーラの3経路。</p>
 
+<div class="callout aim" id="install-quick">
+  <span class="tag">⚡ 最短手順（新規PC・これだけ読めばよい）</span>
+<pre><code>git clone https://github.com/yuu-sysp/llm-wiki-marketplace.git
+cd llm-wiki-marketplace
+.\install.bat</code></pre>
+  <ol>
+    <li><strong>保存先をダイアログで選ぶ</strong>（D: など別ドライブも可。選んだフォルダ直下に <code>LLM-Wiki</code> が作られる）</li>
+    <li><strong>Claude Code を完全に終了して起動し直す</strong> ← ★これを飛ばすと必ず失敗する（<a href="#install-restart">2.8</a>）</li>
+    <li><code>claude plugin list</code> で <code>llm-wiki@llm-wiki-marketplace</code> が <code>enabled</code> なら成功。Claude Code で <code>/llm-wiki:lint</code> が動けば完了</li>
+  </ol>
+  <p>Python が無いPCは <code>.\install.bat -InstallPython</code>。詳細・GUIのみの環境・トラブル時は以下 2.1〜2.8 を参照。</p>
+</div>
+
 <h3 id="install-pre">2.1 前提</h3>
 <ul>
   <li><strong>Python 3</strong> が PATH にある（scripts が Python）。無い場合はインストーラの <code>-InstallPython</code> で自動導入可（2.5）</li>
   <li><strong>Claude Code</strong>：CLI か <strong>デスクトップアプリ</strong>のどちらか。プラグイン登録に必要（登録方法は 2.2〜2.6）</li>
   <li>（private リポジトリから入れる場合）GitHub 認証</li>
+  <li>inbox で <strong>pptx/xlsx/docx/pdf</strong> を扱うなら変換ライブラリ（<code>install.bat</code> が自動導入。オフライン環境は <code>-NoDocLibs</code> で省略可 → <a href="#d-ingest">3.4</a>）</li>
 </ul>
 
 <h3 id="install-public">2.2 public リポジトリの場合（最短）</h3>
@@ -187,7 +205,18 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config vault_root="D:\資�
 <h3 id="install-bat">2.4 インストーラでフォルダ生成まで一括</h3>
 <pre><code>git clone https://github.com/yuu-sysp/llm-wiki-marketplace.git
 cd llm-wiki-marketplace
-.\install.bat -VaultRoot "D:\資料\LLM-Wiki"</code></pre>
+.\install.bat                                  # 保存先はダイアログで選ぶ
+.\install.bat -VaultRoot "D:\資料\LLM-Wiki"    # パスを直接指定する場合</code></pre>
+<p><strong><code>-VaultRoot</code> を省略すると、エクスプローラー風のフォルダ選択ダイアログが開く</strong>（<code>install.bat</code> のダブルクリックでも同じ）。ツリーのルートは「PC」なので <strong>D: など別ドライブも選べる</strong>し、「新しいフォルダー」でその場に作れる。選んだフォルダの<strong>直下に <code>LLM-Wiki</code> フォルダを作る</strong>（<code>LLM-Wiki</code> 自体を選んだ場合は二重にしない）。</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>操作</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td><code>D:\資料</code> を選ぶ</td><td>vault は <code>D:\資料\LLM-Wiki</code></td></tr>
+    <tr><td><code>D:\資料\LLM-Wiki</code> を選ぶ</td><td>vault は <code>D:\資料\LLM-Wiki</code>（二重にしない）</td></tr>
+    <tr><td>キャンセル</td><td><strong>中止</strong>（勝手な場所には作らない）。パス指定か <code>-NoPrompt</code> で再実行</td></tr>
+    <tr><td><code>-NoPrompt</code></td><td>ダイアログを出さず既定 <code>~\Documents\LLM-Wiki</code>（CI・無人実行用）</td></tr>
+  </tbody>
+</table></div>
 <p>Python 検出 → プラグイン登録（claude CLI があれば）→ vault 生成 → 初期 lint まで実行。
 CLI が無ければフォルダ生成まで行い、<strong>デスクトップアプリでの登録手順を表示</strong>する（2.6）。</p>
 
@@ -211,6 +240,41 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
 <p>CLI も入れたい場合（依存なし・自動更新・管理者権限不要）:</p>
 <pre><code>irm https://claude.ai/install.ps1 | iex</code></pre>
 
+<h3 id="install-vault">2.7 vault の保存先（<strong>D ドライブは必須ではない</strong>）</h3>
+<p>本資料に出てくる <code>D:\資料\LLM-Wiki</code> は<strong>単なる例</strong>。仕組み自体はドライブ構成に依存しない。</p>
+<p>パス解決の優先順（<code>scripts/_vault.py</code>）:</p>
+<ol>
+  <li>スクリプトの第1引数</li>
+  <li>環境変数 <code>CLAUDE_PLUGIN_OPTION_VAULT_ROOT</code>（プラグイン userConfig <code>vault_root</code> 由来）</li>
+  <li>環境変数 <code>LLM_WIKI_VAULT_ROOT</code></li>
+</ol>
+<p><code>install.ps1</code> は <code>-VaultRoot</code> 未指定ならフォルダ選択ダイアログを出し（<a href="#install-bat">2.4</a>）、GUI が使えない環境では <strong><code>~\Documents\LLM-Wiki</code></strong> にフォールバックする。よって C ドライブだけの PC でも問題なく動く。</p>
+<pre><code>.\install.bat                                  # ダイアログで選ぶ（D: 等も選択可）
+.\install.bat -VaultRoot "C:\work\LLM-Wiki"    # 任意の場所へ直接指定
+.\install.bat -NoPrompt                        # → C:\Users\&lt;user&gt;\Documents\LLM-Wiki</code></pre>
+<p><code>hooks/hooks.json</code> も <code>${CLAUDE_PLUGIN_ROOT}</code> 相対で書かれているため、ドライブ依存箇所はない。</p>
+<div class="callout warn">
+  <span class="tag">⚠ 移行時の注意</span>
+  <p>個人の <code>~\.claude\CLAUDE.md</code> に vault パスを直書きしていると、そこだけ特定PC依存になる。別PCへ移す／他人に配るときは書き換えるか、「vault ルート（<code>vault_root</code> の設定値）」という表現にしておく。</p>
+</div>
+
+<h3 id="install-restart">2.8 インストール後は <strong>Claude Code を再起動</strong>（重要）</h3>
+<p><code>install.bat</code> が成功しても、<strong>すでに起動している Claude Code には反映されない</strong>。</p>
+<ul>
+  <li>プラグインの <code>vault_root</code>（userConfig）はセッション起動時に読まれる</li>
+  <li><code>LLM_WIKI_VAULT_ROOT</code> は <code>setx</code>（<code>install.ps1:143</code>）なので<strong>既存プロセスには届かない</strong></li>
+</ul>
+<p>この2つが両方空だと、skill が vault を解決できず <strong>「Vault が未設定で inbox の場所が解決できない」</strong>というエラーになる。</p>
+<p>インストール後の確認手順:</p>
+<pre><code>claude plugin list          # llm-wiki@llm-wiki-marketplace が enabled であること</code></pre>
+<p>Claude Code を<strong>完全終了</strong>（デスクトップアプリはタスクトレイ常駐に注意）して起動し直し、<code>/llm-wiki:lint</code> が動けば成功。登録されていなかった場合は手動で:</p>
+<pre><code>claude plugin marketplace add &lt;このリポジトリのパス or GitHub URL&gt;
+claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vaultパス&gt;"</code></pre>
+<div class="callout warn">
+  <span class="tag">⚠ CLI が無いPCの落とし穴</span>
+  <p><strong>claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする</strong>（<code>install.ps1:126</code>）。vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を入れるまで skill は vault を解決できない。</p>
+</div>
+
 <!-- ③ 解説 -->
 <h2 id="detail">③ 解説（仕組みと使い方）</h2>
 <p class="part-note">中で何が動いているか、どう使い、どう保つか。</p>
@@ -218,10 +282,12 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
 <h3 id="d-arch">3.1 全体構成</h3>
 <pre class="diagram"><code>[Claude Code + プラグイン]                 [vault（あなたの知識・Obsidianで開く）]
   skills  init/save/ingest/query/lint   ──▶  concepts/ notes/ pages/ qa/
-  hooks   SessionStart=bootstrap             inbox/  … 自動蓄積の受け皿
-          Stop=save_learnings                sources/… 生ログ保全
-  scripts lint.py / index.py /               meta/   … index.md(自動生成) log rules
-          bootstrap.py / save_learnings.py           lint-ignore.txt template
+  hooks   SessionStart=bootstrap             inbox/  … 自動蓄積＋資料の投入口
+          Stop=save_learnings                          (pptx/xlsx/pdf も置ける)
+  scripts lint.py / index.py /               sources/… 生ログ保全
+          bootstrap.py / save_learnings.py            _attachments/ … 変換元の原本
+          convert_inbox.py                   meta/   … index.md(自動生成) log rules
+                                                       lint-ignore.txt template
                                              _proposals/ … 提案(将来)
         userConfig: vault_root ───────────────┘（このパスで両者が結びつく）</code></pre>
 
@@ -230,13 +296,14 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
   <tbody>
     <tr><td>skill <code>init</code></td><td>vault の足場を生成（bootstrap 呼出）</td></tr>
     <tr><td>skill <code>save</code></td><td>直前の会話の知見をページ化</td></tr>
-    <tr><td>skill <code>ingest</code></td><td>inbox の取り込み（Phase A/B・完了マーカー）</td></tr>
+    <tr><td>skill <code>ingest</code></td><td>inbox の取り込み（Phase 0 変換 → A/B・完了マーカー）</td></tr>
     <tr><td>skill <code>query</code></td><td>Wiki を段階検索して出典付き回答</td></tr>
     <tr><td>skill <code>lint</code></td><td>健全性検査＋index 再生成</td></tr>
     <tr><td>hook SessionStart</td><td><code>bootstrap.py</code>：フォルダ構成を冪等生成</td></tr>
     <tr><td>hook Stop</td><td><code>save_learnings.py</code>：当日足場を用意＋過去日の空スタブ掃除</td></tr>
     <tr><td>script <code>lint.py</code></td><td>赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code）</td></tr>
     <tr><td>script <code>index.py</code></td><td>各ページ frontmatter から index.md を自動生成</td></tr>
+    <tr><td>script <code>convert_inbox.py</code></td><td>inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は <code>sources/_attachments/</code> へ）</td></tr>
   </tbody>
 </table></div>
 
@@ -275,13 +342,55 @@ created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---</code></pre>
 
-<h3 id="d-publish">3.4 更新・発行</h3>
+<h3 id="d-ingest">3.4 既存資料の Wiki 化（inbox に置いて ingest）</h3>
+<p>過去に書いた資料・メモを取り込むときは、<strong><code>inbox/</code> に置いて <code>/llm-wiki:ingest</code> を叩くだけ</strong>。pptx・xlsx・docx・pdf などもそのまま置ける（自動で md に変換される）。</p>
+<ol>
+  <li><code>&lt;vault&gt;/inbox/</code> にファイルを置く（形式は下表）</li>
+  <li>Claude Code で <code>/llm-wiki:ingest</code>（「inbox を処理して」でも起動）</li>
+  <li><strong>Phase 0</strong>: <code>convert_inbox.py</code> が非 md を md へ変換し、<strong>原本は <code>sources/_attachments/</code> へ退避</strong></li>
+  <li><strong>Phase A</strong>: 種別分類 → 原文を <code>sources/&lt;genre&gt;/</code> へ移動（<strong>本文は無加工</strong>、frontmatter だけ付与）</li>
+  <li><strong>Phase B</strong>: <code>concepts/ notes/ pages/</code> の既存ページを検索し、あれば統合更新・無ければ新規作成。<code>[[リンク]]</code>＋frontmatter を付ける</li>
+  <li>全部終わった<strong>最後にだけ</strong>ソースへ <code>type: source</code> を立てる → 途中で落ちても再実行で続行、二重取り込みなし</li>
+  <li>仕上げに <code>index.py</code> 再生成＋<code>lint.py</code>（inbox が空・exit 0 になるまでクローズしない）</li>
+</ol>
+
+<h4>対応形式</h4>
+<div class="tablewrap"><table>
+  <thead><tr><th>形式</th><th>変換内容</th><th>必要なライブラリ</th></tr></thead>
+  <tbody>
+    <tr><td><code>.md</code></td><td>そのまま</td><td>—</td></tr>
+    <tr><td><code>.txt</code> <code>.log</code> <code>.json</code> <code>.yml</code></td><td>本文そのまま（<strong>cp932 の日本語も自動判別</strong>）</td><td>—</td></tr>
+    <tr><td><code>.csv</code> <code>.tsv</code></td><td>markdown table</td><td>—</td></tr>
+    <tr><td><code>.html</code> <code>.htm</code></td><td>タグ除去（script/style は捨てる）</td><td>—</td></tr>
+    <tr><td><code>.docx</code></td><td>見出し階層＋段落＋表を markdown 化</td><td>python-docx</td></tr>
+    <tr><td><code>.xlsx</code> <code>.xlsm</code></td><td>シートごとに markdown table（<strong>数式でなく値</strong>を取る）</td><td>openpyxl</td></tr>
+    <tr><td><code>.pptx</code></td><td>スライドごとにテキスト＋発表者ノート</td><td>python-pptx</td></tr>
+    <tr><td><code>.pdf</code></td><td>ページごとにテキスト抽出</td><td>pypdf</td></tr>
+    <tr><td><code>.doc</code> <code>.xls</code> <code>.ppt</code></td><td><strong>非対応</strong>。<code>.docx</code> 等で保存し直す</td><td>—</td></tr>
+  </tbody>
+</table></div>
+<p>ライブラリは <code>install.bat</code> が自動で <code>pip install</code> する。未導入でも上4行の形式は変換でき、<strong>PDF はライブラリ無しでも ingest 時に Claude が直接読み取れる</strong>（Read が PDF ネイティブ対応のため）。手で入れる場合:</p>
+<pre><code>pip install python-docx openpyxl python-pptx pypdf</code></pre>
+<p>単体実行（Claude を介さず変換だけしたい場合）:</p>
+<pre><code>python plugins/llm-wiki/scripts/convert_inbox.py "&lt;vaultパス&gt;"</code></pre>
+<div class="callout warn">
+  <span class="tag">⚠ 注意点</span>
+  <ul>
+    <li>変換後の md は <code>inbox/&lt;元の名前&gt;.md</code>。<strong>同名 md が既にあれば <code>-1</code> と採番</strong>し、既存は絶対に上書きしない</li>
+    <li>xlsx は 1 シート 2000 行、PDF は 300 ページで打ち切る（打ち切った旨を md 内と実行ログの両方に明記）</li>
+    <li>0byte・中身なしスタブは取り込まず削除される（自動蓄積フックの空足場対策）</li>
+    <li>ファイル名は自由（自動蓄積分の慣習は <code>{YYYY-MM-DD}-{プロジェクト名}.md</code>）</li>
+    <li>大量にあるときは<strong>ジャンル単位で小分け</strong>投入が安全。既存ページとの統合判断の精度が上がる</li>
+  </ul>
+</div>
+
+<h3 id="d-publish">3.5 更新・発行</h3>
 <ul>
   <li>プラグインを直したら（開発PC）：<code>.\publish.bat "変更内容"</code> → GitHub へ push</li>
   <li>各ユーザー側の更新：<code>/plugin marketplace update llm-wiki-marketplace</code></li>
 </ul>
 
-<h3 id="d-trouble">3.5 注意点・トラブルシュート</h3>
+<h3 id="d-trouble">3.6 注意点・トラブルシュート</h3>
 <div class="tablewrap"><table>
   <thead><tr><th>症状</th><th>原因・対処</th></tr></thead>
   <tbody>
@@ -292,6 +401,11 @@ updated: YYYY-MM-DD
     <tr><td>private repo で <code>marketplace add</code> 失敗</td><td>各PCで <code>gh auth login</code>＋<code>gh auth setup-git</code>、HTTPSはフルURL指定</td></tr>
     <tr><td>private + HTTPS で自動更新されない</td><td>背景更新は認証が効かない。手動 <code>marketplace update</code>／SSH運用／<code>CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1</code></td></tr>
     <tr><td>lint が当日 inbox スタブを挙げる</td><td>「想定内」区分で失敗に数えない。翌日フックが自動掃除</td></tr>
+    <tr><td><strong>「Vault が未設定で inbox の場所が解決できない」</strong></td><td>vault の解決経路が両方空。①<code>claude plugin list</code> に <code>llm-wiki@llm-wiki-marketplace</code> が居るか確認 → 無ければ再インストール ②<strong>Claude Code を完全終了して再起動</strong>（<code>setx</code> も userConfig も起動済みプロセスには届かない）。詳細は <a href="#install-restart">2.8</a></td></tr>
+    <tr><td>インストーラは「完了」と出たのに skill が vault を見つけない</td><td>CLI が無い環境では install.ps1 が<strong>プラグイン登録をスキップ</strong>する（vault フォルダだけ作って完了する）。GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を必ず入力する</td></tr>
+    <tr><td>pptx/xlsx/docx が「未導入でスキップ」される</td><td>変換ライブラリが無い。<code>pip install python-docx openpyxl python-pptx pypdf</code>（<a href="#d-ingest">3.4</a>）。オフライン環境なら install 時に <code>-NoDocLibs</code></td></tr>
+    <tr><td>lint に「inbox 未変換ファイル」が出る</td><td>非 md が残っている。<code>convert_inbox.py</code> を実行。<code>.doc/.xls/.ppt</code> は <code>.docx</code> 等で保存し直す</td></tr>
+    <tr><td>移行先PCに D ドライブが無い</td><td>D ドライブは不要。<code>vault_root</code> を任意パスに（既定 <code>~\Documents\LLM-Wiki</code>）。<code>~\.claude\CLAUDE.md</code> に直書きしたパスは要書き換え（<a href="#install-vault">2.7</a>）</td></tr>
   </tbody>
 </table></div>
 
