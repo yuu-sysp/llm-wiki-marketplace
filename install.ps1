@@ -256,7 +256,8 @@ if ($havePluginCli) {
 
 # ============ 4) フォルダ構成＋meta雛形（bootstrap は冪等） ============
 Write-Host "`n--- vault 生成 ---"
-& $PY (Join-Path $RepoRoot "plugins\llm-wiki\scripts\bootstrap.py") "$VaultRoot"
+# --quiet-policy: 蓄積方針の出力は SessionStart フック用。インストーラのログには不要
+& $PY (Join-Path $RepoRoot "plugins\llm-wiki\scripts\bootstrap.py") "$VaultRoot" --quiet-policy
 
 # ============ 5) 環境変数（スタンドアロン実行のフォールバック） ============
 setx LLM_WIKI_VAULT_ROOT "$VaultRoot" | Out-Null

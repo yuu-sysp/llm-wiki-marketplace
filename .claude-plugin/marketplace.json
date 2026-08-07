@@ -6,8 +6,8 @@
     {
       "name": "llm-wiki",
       "source": "./plugins/llm-wiki",
-      "description": "ハイブリッド LLM Wiki（自動蓄積・決定論lint・index自動生成・提案ワークフロー）",
-      "version": "0.1.0",
+      "description": "ハイブリッド LLM Wiki（蓄積方針の配布・自動蓄積・決定論lint・index自動生成）",
+      "version": "0.2.0",
       "author": { "name": "yyasunobe" }
     }
   ]

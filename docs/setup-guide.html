@@ -117,6 +117,7 @@
         <li><a href="#install-desktop">デスクトップアプリだけの場合</a></li>
         <li><a href="#install-vault">vault の保存先（Dドライブ不要）</a></li>
         <li><a href="#install-restart">インストール後は再起動（重要）</a></li>
+  <li><a href="#install-policy">蓄積方針はプラグインが配る（設定不要）</a></li>
       </ol>
     </li>
     <li><a href="#detail">解説（仕組みと使い方）</a>
@@ -176,7 +177,7 @@ cd llm-wiki-marketplace
     <li><strong>Claude Code を完全に終了して起動し直す</strong> ← ★これを飛ばすと必ず失敗する（<a href="#install-restart">2.8</a>）</li>
     <li><code>claude plugin list</code> で <code>llm-wiki@llm-wiki-marketplace</code> が <code>enabled</code> なら成功。Claude Code で <code>/llm-wiki:lint</code> が動けば完了</li>
   </ol>
-  <p>Python が無いPCは <code>.\install.bat -InstallPython</code>。詳細・GUIのみの環境・トラブル時は以下 2.1〜2.8 を参照。</p>
+  <p>Python が無いPCは <code>.\install.bat -InstallPython</code>。詳細・GUIのみの環境・トラブル時は以下 2.1〜2.9 を参照。</p>
 </div>
 
 <h3 id="install-pre">2.1 前提</h3>
@@ -255,7 +256,7 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
 <p><code>hooks/hooks.json</code> も <code>${CLAUDE_PLUGIN_ROOT}</code> 相対で書かれているため、ドライブ依存箇所はない。</p>
 <div class="callout warn">
   <span class="tag">⚠ 移行時の注意</span>
-  <p>個人の <code>~\.claude\CLAUDE.md</code> に vault パスを直書きしていると、そこだけ特定PC依存になる。別PCへ移す／他人に配るときは書き換えるか、「vault ルート（<code>vault_root</code> の設定値）」という表現にしておく。</p>
+  <p>個人の <code>~\.claude\CLAUDE.md</code> に vault パスを直書きしていると、そこだけ特定PC依存になる。<strong>v0.2 以降は書く必要がない</strong> — 解決済み vault パスと蓄積方針は SessionStart フック（<code>bootstrap.py</code>）が毎セッション context に注入する（<a href="#install-policy">2.9</a>）。既に直書きしている場合は削除してよい。</p>
 </div>
 
 <h3 id="install-restart">2.8 インストール後は <strong>Claude Code を再起動</strong>（重要）</h3>
@@ -274,6 +275,26 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vau
   <span class="tag">⚠ CLI が無いPCの落とし穴</span>
   <p><strong>claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする</strong>（<code>install.ps1:126</code>）。vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を入れるまで skill は vault を解決できない。</p>
 </div>
+
+<h3 id="install-policy">2.9 蓄積方針はプラグインが配る（v0.2 以降・設定不要）</h3>
+<p>「自動蓄積」は 2 つの部品の組み合わせで成立する。<strong>片方だけでは空回りする。</strong></p>
+<table>
+  <thead><tr><th>部品</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td>Stop フック <code>save_learnings.py</code></td><td>当日 <code>inbox/{日付}-{プロジェクト}.md</code> の<strong>空の足場</strong>を用意</td></tr>
+    <tr><td>SessionStart フック <code>bootstrap.py</code></td><td>「いつ・何を・どこへ書くか」の<strong>蓄積方針を context に注入</strong></td></tr>
+  </tbody>
+</table>
+<p>v0.1 では方針が各利用者の <code>~\.claude\CLAUDE.md</code> にしか無く、新規インストールでは<strong>毎日空のスタブが生成されるだけで誰も埋めない</strong>状態だった。v0.2 でプラグイン側から配る。</p>
+<p>注入される内容（<code>bootstrap.py</code> の <code>POLICY</code>）:</p>
+<ul>
+  <li>解決済み vault パスと、当日の追記先ファイル名</li>
+  <li>記録トリガー → 配置先（concepts / notes / pages）</li>
+  <li>書き方のルール（見出しに種別を明記／コード例を含める／wikilink と backtick の使い分け／<strong>資格情報は伏せ字化する</strong>）</li>
+  <li>skill 一覧</li>
+</ul>
+<p><strong>利用者は <code>~\.claude\CLAUDE.md</code> に何も書かなくてよい。</strong> 方針を変えたい場合は <code>plugins/llm-wiki/scripts/bootstrap.py</code> の <code>POLICY</code> を編集して再発行する（毎セッション context に載るため行数は最小限に）。</p>
+<p>インストーラは <code>--quiet-policy</code> 付きで <code>bootstrap.py</code> を呼ぶので、導入ログには方針が出ない。</p>
 
 <!-- ③ 解説 -->
 <h2 id="detail">③ 解説（仕組みと使い方）</h2>

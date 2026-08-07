@@ -48,7 +48,7 @@ cd llm-wiki-marketplace
    Claude Code で `/llm-wiki:lint` が動けば完了
 
 Python が無いPCは `.\install.bat -InstallPython`。
-詳細・GUIのみの環境・トラブル時は以下 2.1〜2.8 を参照。
+詳細・GUIのみの環境・トラブル時は以下 2.1〜2.9 を参照。
 
 ### 2.1 前提
 - **Python 3** が PATH にある（scripts が Python）。無い場合はインストーラの `-InstallPython` で自動導入可（2.5）。
@@ -135,7 +135,8 @@ irm https://claude.ai/install.ps1 | iex
 `hooks/hooks.json` も `${CLAUDE_PLUGIN_ROOT}` 相対で書かれているため、ドライブ依存箇所はない。
 
 > ⚠ 個人の `~\.claude\CLAUDE.md` に vault パスを直書きしていると、そこだけ特定PC依存になる。
-> 別PCへ移す／他人に配るときは書き換えるか、「vault ルート（`vault_root` の設定値）」という表現にしておく。
+> **v0.2 以降は書く必要がない** — 解決済み vault パスと蓄積方針は SessionStart フック（`bootstrap.py`）が
+> 毎セッション context に注入する（2.9）。既に直書きしている場合は削除してよい。
 
 ### 2.8 インストール後は **Claude Code を再起動**（重要）
 `install.bat` が成功しても、**すでに起動している Claude Code には反映されない**。
@@ -163,6 +164,32 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=<vault�
 > vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、
 > GUI 登録（2.6）で `vault_root` を入れるまで skill は vault を解決できない。
 
+### 2.9 蓄積方針はプラグインが配る（v0.2 以降・設定不要）
+
+「自動蓄積」は 2 つの部品の組み合わせで成立する。**片方だけでは空回りする。**
+
+| 部品 | 役割 |
+|---|---|
+| Stop フック `save_learnings.py` | 当日 `inbox/{日付}-{プロジェクト}.md` の**空の足場**を用意 |
+| SessionStart フック `bootstrap.py` | 「いつ・何を・どこへ書くか」の**蓄積方針を context に注入** |
+
+v0.1 では方針が各利用者の `~\.claude\CLAUDE.md` にしか無く、新規インストールでは
+**毎日空のスタブが生成されるだけで誰も埋めない**状態だった。v0.2 でプラグイン側から配る。
+
+注入される内容（`bootstrap.py` の `POLICY`）:
+
+- 解決済み vault パスと、当日の追記先ファイル名
+- 記録トリガー → 配置先（concepts / notes / pages）
+- 書き方のルール（見出しに種別を明記／コード例を含める／wikilink と backtick の使い分け／
+  **資格情報は伏せ字化する**）
+- skill 一覧
+
+**利用者は `~\.claude\CLAUDE.md` に何も書かなくてよい。** 方針を変えたい場合は
+`plugins/llm-wiki/scripts/bootstrap.py` の `POLICY` を編集して再発行する
+（毎セッション context に載るため行数は最小限に）。
+
+インストーラは `--quiet-policy` 付きで `bootstrap.py` を呼ぶので、導入ログには方針が出ない。
+
 ---
 
 ## ③ 解説（仕組みと使い方）
@@ -172,7 +199,8 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=<vault�
 [Claude Code + プラグイン]                 [vault（あなたの知識・Obsidianで開く）]
   skills  init/save/ingest/query/lint   ──▶  concepts/ notes/ pages/ qa/
   hooks   SessionStart=bootstrap             inbox/  … 自動蓄積＋資料の投入口
-          Stop=save_learnings                          (pptx/xlsx/pdf も置ける)
+          (足場生成＋蓄積方針の注入)                   (pptx/xlsx/pdf も置ける)
+          Stop=save_learnings(当日足場)
   scripts lint.py / index.py /               sources/… 生ログ保全
           bootstrap.py / save_learnings.py            _attachments/ … 変換元の原本
           convert_inbox.py                   meta/   … index.md(自動生成) log rules
