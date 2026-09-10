@@ -50,6 +50,9 @@ cd llm-wiki-marketplace
 Python が無いPCは `.\install.bat -InstallPython`。
 詳細・GUIのみの環境・トラブル時は以下 2.1〜2.9 を参照。
 
+> 人に配る用の短い手順書として `docs/install-guide.html` がある（導入3経路・更新・トラブルのみ）。
+> このファイル単体で完結するので、そのまま送ってよい。
+
 ### 2.1 前提
 - **Python 3** が PATH にある（scripts が Python）。無い場合はインストーラの `-InstallPython` で自動導入可（2.5）。
 - **Claude Code**：CLI か **デスクトップアプリ**のどちらか。プラグイン登録に必要（登録方法は下記）。

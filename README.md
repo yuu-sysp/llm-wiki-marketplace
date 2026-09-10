@@ -13,6 +13,7 @@
 - `install.ps1` / `install.bat` … 新規PC導入用インストーラ
 - `publish.bat` … このリポジトリを GitHub へ発行（version の整合チェック付き）
 - `tools/check_version.py` … 発行前の version 検査（2つの manifest の一致・bump 忘れ）
+- `docs/install-guide.html` … **配布用の導入・更新手順**（これだけ渡せば新規PCに入れられる）
 - `docs/setup-guide.md` / `.html` … セットアップ資料（ねらい／導入／解説／全社展開）
 - `.claude-plugin/marketplace.json` … マーケットプレイス定義
 

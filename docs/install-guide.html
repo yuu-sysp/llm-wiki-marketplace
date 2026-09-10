@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Wiki 導入・更新手順</title>
+<style>
+  /* 配色・書体は docs/setup-guide.html と共通（同じ資料群として揃える） */
+  :root{
+    --bg:#ffffff; --fg:#1f2430; --muted:#5b6472; --line:#e3e7ee;
+    --card:#f7f9fc; --accent:#4c6ef5; --accent-weak:#eaf0ff;
+    --code-bg:#f4f6fa; --code-fg:#334455; --th:#eef2f8;
+    --note:#eaf3ff; --note-bd:#4c6ef5; --warn:#fff5e9; --warn-bd:#e8912d;
+    --ok:#ecfaf3; --ok-bd:#25a06a; --ok-fg:#1c7a51;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1420; --fg:#e6e9ef; --muted:#9aa4b2; --line:#28303f;
+      --card:#161d2b; --accent:#7ea0ff; --accent-weak:#1a2338;
+      --code-bg:#141b28; --code-fg:#cdd6e5; --th:#1b2434;
+      --note:#152238; --note-bd:#5b7cff; --warn:#2c2413; --warn-bd:#d9922f;
+      --ok:#13271e; --ok-bd:#2fae74; --ok-fg:#66c99b;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1420; --fg:#e6e9ef; --muted:#9aa4b2; --line:#28303f;
+    --card:#161d2b; --accent:#7ea0ff; --accent-weak:#1a2338;
+    --code-bg:#141b28; --code-fg:#cdd6e5; --th:#1b2434;
+    --note:#152238; --note-bd:#5b7cff; --warn:#2c2413; --warn-bd:#d9922f;
+    --ok:#13271e; --ok-bd:#2fae74; --ok-fg:#66c99b;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  .wrap{max-width:880px; margin:0 auto; padding-block:2.5rem 4rem; padding-left:1.25rem; padding-right:1.25rem}
+  header.hero{border-bottom:1px solid var(--line); padding-bottom:1.3rem}
+  header.hero h1{font-size:1.85rem; margin:0 0 .4rem; line-height:1.3; text-wrap:balance}
+  header.hero p{margin:.2rem 0; color:var(--muted); max-width:62ch}
+  .meta{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.8rem}
+  .meta span{background:var(--accent-weak); color:var(--accent); border:1px solid var(--line);
+    padding:.2rem .7rem; border-radius:999px; font-size:.8rem; font-weight:600}
+  h2{font-size:1.32rem; margin:2.6rem 0 .8rem; padding:.15rem 0 .15rem .7rem;
+     border-left:5px solid var(--accent); line-height:1.35; text-wrap:balance}
+  h3{font-size:1.05rem; margin:1.6rem 0 .5rem}
+  p{margin:.6rem 0; max-width:68ch}
+  a{color:var(--accent)}
+  ul{padding-left:1.3rem}
+  li{margin:.3rem 0}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; font-size:.86em;
+    background:var(--code-bg); color:var(--code-fg); padding:.12em .4em; border-radius:5px}
+  pre{background:var(--code-bg); color:var(--code-fg); padding:.9rem 1.05rem; border-radius:10px;
+    overflow-x:auto; border:1px solid var(--line); font-size:.86rem; line-height:1.6; margin:.7rem 0}
+  pre code{background:none; padding:0; font-size:inherit}
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin:1rem 0}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:.92rem}
+  th,td{text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:var(--th); font-weight:650; white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .callout{border-left:4px solid var(--note-bd); background:var(--note); border-radius:0 10px 10px 0;
+    padding:.8rem 1rem; margin:1.1rem 0}
+  .callout.warn{border-left-color:var(--warn-bd); background:var(--warn)}
+  .callout .tag{font-weight:700; font-size:.8rem; letter-spacing:.03em; display:block; margin-bottom:.25rem}
+  .callout p{margin:0; max-width:none}
+
+  /* 手順は順序に意味がある（再起動などを飛ばすと必ず失敗する）ので番号を振る。
+     各手順は「やること」と「成否の判定」を対で持つ — この仕組みの失敗は
+     "成功したように見えて動いていない" 形で出るため、確認手段を毎回添える。 */
+  ol.steps{list-style:none; counter-reset:step; margin:1rem 0; padding:0;
+    display:flex; flex-direction:column; gap:1.4rem}
+  ol.steps > li{counter-increment:step; position:relative; padding-left:2.7rem}
+  ol.steps > li::before{
+    content:counter(step); position:absolute; left:0; top:.05rem;
+    width:1.85rem; height:1.85rem; border-radius:50%;
+    background:var(--accent-weak); color:var(--accent); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-size:.85rem; font-weight:700; font-variant-numeric:tabular-nums;
+  }
+  ol.steps h4{margin:0 0 .35rem; font-size:1rem; line-height:1.5}
+  ol.steps p{margin:.4rem 0}
+  .verify{background:var(--ok); border:1px solid var(--ok-bd); border-radius:8px;
+    padding:.5rem .8rem; font-size:.9rem; max-width:none}
+  .verify b{color:var(--ok-fg); font-size:.78rem; letter-spacing:.05em; display:block; margin-bottom:.15rem}
+  .routes{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.9rem; margin:1.1rem 0}
+  .routes > div{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem}
+  .routes h3{margin:.1rem 0 .3rem; font-size:.98rem}
+  .routes p{margin:.2rem 0; font-size:.9rem; color:var(--muted); max-width:none}
+  .skills{font-size:.93rem}
+  footer{margin-top:3rem; padding-top:1.2rem; border-top:1px solid var(--line); color:var(--muted); font-size:.85rem}
+  .theme-btn{position:fixed; top:1rem; right:1rem; background:var(--card); color:var(--fg);
+    border:1px solid var(--line); border-radius:999px; padding:.4rem .8rem; font-size:.8rem; cursor:pointer}
+  .theme-btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  @media (max-width:560px){ .theme-btn{position:static; margin:1rem 0 0 1.25rem} }
+</style>
+</head>
+<body>
+<button class="theme-btn" type="button" onclick="var r=document.documentElement,d=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.setAttribute('data-theme',d==='dark'?'light':'dark')">◐ テーマ</button>
+<div class="wrap">
+
+<header class="hero">
+  <h1>LLM Wiki 導入・更新手順</h1>
+  <p>Claude Code プラグイン <code>llm-wiki</code> を新しいPCに入れる／すでに入っているPCを更新するための手順書。所要 5分。</p>
+  <div class="meta">
+    <span>v0.3.0</span><span>Windows</span><span>Python 3 が必要</span>
+  </div>
+</header>
+
+<h2>どの手順を使うか</h2>
+<div class="routes">
+  <div>
+    <h3>A. インストーラ（推奨）</h3>
+    <p>CLI の有無を問わない。vault のフォルダ構成まで作る。</p>
+  </div>
+  <div>
+    <h3>B. Claude Code 内から</h3>
+    <p>最短。フォルダ生成は初回セッションに任せる。</p>
+  </div>
+  <div>
+    <h3>C. デスクトップアプリのみ</h3>
+    <p>CLI が無く、GUI だけで登録する場合。</p>
+  </div>
+</div>
+
+<h2>前提</h2>
+<ul>
+  <li><b>Python 3</b> が <b>コマンド名 <code>python</code> で起動できる</b>こと。フックが <code>python</code> を直接呼ぶため、<code>py</code> ランチャーだけの環境では自動蓄積が動かない（インストーラが検出して警告する）。無ければ <code>install.bat -InstallPython</code> で自動導入できる。</li>
+  <li><b>Claude Code</b>（CLI かデスクトップアプリのどちらか）。プラグイン登録に必要。</li>
+  <li>inbox で pptx / xlsx / docx / pdf を扱うなら変換ライブラリ（インストーラが自動導入。オフライン環境は <code>-NoDocLibs</code> で省略）。</li>
+</ul>
+
+<h2>A. インストーラで入れる</h2>
+<ol class="steps">
+  <li>
+    <h4>リポジトリを取得する</h4>
+<pre><code>git clone https://github.com/yuu-sysp/llm-wiki-marketplace.git
+cd llm-wiki-marketplace</code></pre>
+  </li>
+  <li>
+    <h4>インストーラを実行し、保存先を選ぶ</h4>
+<pre><code>.\install.bat                                  # 保存先はダイアログで選ぶ
+.\install.bat -VaultRoot "D:\資料\LLM-Wiki"    # パスを直接指定する場合
+.\install.bat -InstallPython                   # Python が無いPC</code></pre>
+    <p>選んだフォルダの<b>直下に <code>LLM-Wiki</code> を作る</b>（<code>LLM-Wiki</code> 自体を選んだ場合は二重にしない）。D: など別ドライブも選べる。キャンセルすると中止する（勝手な場所には作らない）。</p>
+    <p class="verify"><b>確認</b>ログに <code>[OK] Python</code> と <code>[OK] プラグイン登録＋vault_root 設定を確認</code> が出ること。<code>[!!] コマンド名 python では…</code> が出たら、先にそれを解消する。</p>
+  </li>
+  <li>
+    <h4>Claude Code を完全に終了して起動し直す</h4>
+    <p>起動済みのセッションには <code>vault_root</code> も環境変数も届かない。デスクトップアプリはタスクトレイに常駐していることがあるので、終了しきること。</p>
+    <p class="verify"><b>確認</b>ここを飛ばすと、必ず「Vault が未設定」で失敗する。</p>
+  </li>
+  <li>
+    <h4>動作を確認する</h4>
+<pre><code>claude plugin list        # llm-wiki@llm-wiki-marketplace が enabled</code></pre>
+    <p class="verify"><b>確認</b>Claude Code で <code>/llm-wiki:lint</code> が動けば導入完了。</p>
+  </li>
+</ol>
+
+<h2>B. Claude Code 内から入れる</h2>
+<ol class="steps">
+  <li>
+    <h4>マーケットプレイスを登録してインストールする</h4>
+<pre><code>/plugin marketplace add yuu-sysp/llm-wiki-marketplace
+/plugin install llm-wiki@llm-wiki-marketplace</code></pre>
+  </li>
+  <li>
+    <h4><code>vault_root</code> に保存先を入力する</h4>
+    <p>例: <code>D:\資料\LLM-Wiki</code> / <code>C:\Users\&lt;ユーザー名&gt;\Documents\LLM-Wiki</code></p>
+    <p class="verify"><b>確認</b><b>空のまま Confirm しないこと。</b>空だと skill が vault を解決できず「inbox の場所が解決できない」になる。</p>
+  </li>
+  <li>
+    <h4>Claude Code を再起動する</h4>
+    <p>フォルダ構成は初回セッションの SessionStart フックが自動生成する。</p>
+    <p class="verify"><b>確認</b><code>/llm-wiki:lint</code> が動き、vault に <code>concepts/ notes/ pages/ inbox/ meta/</code> ができていること。</p>
+  </li>
+</ol>
+
+<h2>C. デスクトップアプリだけの場合</h2>
+<ol class="steps">
+  <li>
+    <h4>プラグイン画面を開く</h4>
+    <p>プロンプト横の <b>［＋］→ Plugins</b>（または chat に <code>/plugin</code> と入力）。</p>
+  </li>
+  <li>
+    <h4>Marketplaces タブ → Add marketplace</h4>
+    <p>次を貼り付ける: <code>https://github.com/yuu-sysp/llm-wiki-marketplace.git</code></p>
+  </li>
+  <li>
+    <h4>Discover タブ → llm-wiki を Install</h4>
+    <p>スコープは <b>User</b>。<code>vault_root</code> に保存先を入力して Confirm。</p>
+    <p class="verify"><b>確認</b><code>/reload-plugins</code> のあと、<code>/</code> メニューに <code>/llm-wiki:init</code> などが出ること。</p>
+  </li>
+</ol>
+
+<h2>vault（Wiki の保存先）について</h2>
+<p>D ドライブは必須ではない。パスは次の順で解決する。</p>
+<div class="tablewrap"><table>
+  <tr><th>優先</th><th>解決元</th><th>設定される場所</th></tr>
+  <tr><td>1</td><td>スクリプトの第1引数</td><td>単体実行のときだけ</td></tr>
+  <tr><td>2</td><td><code>CLAUDE_PLUGIN_OPTION_VAULT_ROOT</code></td><td>プラグインの <code>vault_root</code>（userConfig）</td></tr>
+  <tr><td>3</td><td><code>LLM_WIKI_VAULT_ROOT</code></td><td>インストーラが <code>setx</code> で設定（フォールバック）</td></tr>
+</table></div>
+<div class="callout">
+  <span class="tag">設定不要</span>
+  <p>「いつ・何を・どこへ書くか」の蓄積方針は SessionStart フックが毎セッション自動で配る。利用者が <code>~\.claude\CLAUDE.md</code> に書く必要はない（書くと、そのPCだけの設定になってしまう）。</p>
+</div>
+
+<h2>更新する（すでに入っているPC）</h2>
+<div class="callout warn">
+  <span class="tag">つまずきやすい点</span>
+  <p><code>marketplace update</code> だけでは<b>プラグイン本体は更新されない</b>。<code>install</code> も「already installed」で何もしない。<b><code>plugin update</code> が必要</b>。</p>
+</div>
+<div class="tablewrap"><table>
+  <tr><th>コマンド</th><th>効果</th></tr>
+  <tr><td><code>claude plugin marketplace update llm-wiki-marketplace</code></td><td>マーケットプレイス定義を取り直すだけ</td></tr>
+  <tr><td><code>claude plugin install llm-wiki@llm-wiki-marketplace</code></td><td>導入済みなら何もしない</td></tr>
+  <tr><td><code>claude plugin update llm-wiki@llm-wiki-marketplace</code></td><td><b>本体を新しい version へ</b>（要再起動）</td></tr>
+</table></div>
+<ol class="steps">
+  <li>
+    <h4>定義を取り直して本体を更新する</h4>
+<pre><code>claude plugin marketplace update llm-wiki-marketplace
+claude plugin update llm-wiki@llm-wiki-marketplace</code></pre>
+    <p class="verify"><b>確認</b><code>updated from &lt;旧&gt; to &lt;新&gt;</code> と <code>Restart to apply changes</code> が出ること。</p>
+  </li>
+  <li>
+    <h4>Claude Code を再起動する</h4>
+    <p class="verify"><b>確認</b><code>~\.claude\plugins\installed_plugins.json</code> の <code>version</code> と <code>installPath</code> が新しい版に変わっていること。</p>
+  </li>
+</ol>
+
+<h2>直したものを配る（発行側）</h2>
+<div class="callout">
+  <span class="tag">version を上げないと届かない</span>
+  <p>プラグインは <code>~\.claude\plugins\cache\&lt;marketplace&gt;\&lt;plugin&gt;\&lt;version&gt;\</code> に <b>version 単位</b>で展開される。version が据え置きだと、利用者が更新しても古いコードのまま動き続ける。</p>
+</div>
+<ol class="steps">
+  <li>
+    <h4>version を2箇所とも同じ値に上げる</h4>
+    <p><code>plugins/llm-wiki/.claude-plugin/plugin.json</code> と <code>.claude-plugin/marketplace.json</code>。</p>
+  </li>
+  <li>
+    <h4>発行する</h4>
+<pre><code>.\publish.bat "変更内容"     # メッセージは必ずダブルクォートで囲む</code></pre>
+    <p class="verify"><b>確認</b>version の不一致・上げ忘れは <code>publish.bat</code> が検出して発行を止める。push 後は GitHub Actions（plugin-smoke）が green になること。</p>
+  </li>
+</ol>
+
+<h2>困ったとき</h2>
+<div class="tablewrap"><table>
+  <tr><th>症状</th><th>原因と対処</th></tr>
+  <tr><td>「Vault が未設定で inbox の場所が解決できない」</td><td>vault の解決経路が両方空。<code>claude plugin list</code> に居るか確認し、<b>Claude Code を完全終了して再起動</b>する</td></tr>
+  <tr><td>インストーラは「完了」なのに skill が vault を見つけない</td><td>CLI が無い環境では登録がスキップされ、vault フォルダだけが作られる。手順 C で <code>vault_root</code> を入力する</td></tr>
+  <tr><td>蓄積方針が出ない／inbox に当日ファイルができない</td><td>フックが呼ぶ <code>python</code> が使えない。<code>-InstallPython</code> で導入するか PATH を通す。Microsoft Store のエイリアスが横取りしている場合は「設定 &gt; アプリ &gt; アプリ実行エイリアス」で <code>python.exe</code> を OFF にする</td></tr>
+  <tr><td>更新したのに古い挙動のまま</td><td>①<code>plugin update</code> を叩いていない ②発行側が version を上げ忘れている</td></tr>
+  <tr><td>lint に「inbox 未変換」が出る</td><td>非 md が残っている。<code>/llm-wiki:ingest</code> が変換する。末尾 <code>/</code> はフォルダなので中のファイルを inbox 直下へ出す。<code>.doc/.xls/.ppt</code> は <code>.docx</code> 等で保存し直す</td></tr>
+  <tr><td>lint が当日の inbox スタブを挙げる</td><td>想定内。失敗には数えない（翌日フックが自動で掃除する）</td></tr>
+  <tr><td><code>.bat</code> が「指定されたファイルが見つかりません」</td><td>.bat は ASCII＋CRLF 必須。UTF-8/LF で保存すると cmd.exe が誤動作する</td></tr>
+</table></div>
+
+<h2>導入後の使い方</h2>
+<ul class="skills">
+  <li><code>/llm-wiki:save</code> … 直前の会話の知見をページ化する</li>
+  <li><code>/llm-wiki:ingest</code> … <code>inbox/</code> の資料（pptx/xlsx/docx/pdf も可）を取り込む</li>
+  <li><code>/llm-wiki:query</code> … Wiki を検索して出典付きで答える</li>
+  <li><code>/llm-wiki:lint</code> … 赤リンク・孤立ページ・inbox 残りを検査し index を再生成する</li>
+  <li><code>/llm-wiki:init</code> … vault の足場を作り直す（既存ファイルは上書きしない）</li>
+</ul>
+<p>普通に開発しているだけで、知見は <code>inbox/{日付}-{プロジェクト名}.md</code> に溜まっていく。区切りで <code>/llm-wiki:ingest</code> を叩けばページになる。</p>
+
+<footer>
+  <p>リポジトリ: <a href="https://github.com/yuu-sysp/llm-wiki-marketplace">github.com/yuu-sysp/llm-wiki-marketplace</a><br>
+  仕組みの解説・既存資料の取り込み・全社展開の検討は <code>docs/setup-guide.html</code> を参照。</p>
+</footer>
+
+</div>
+</body>
+</html>
