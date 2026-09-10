@@ -19,11 +19,15 @@
 | `meta/`     | index.md / log.md / rules.md / lint-ignore.txt / テンプレート |
 | `_proposals/` | lint/curiosity の修正提案（pending → applied/rejected） |
 
+`concepts/ notes/ pages/ qa/` は**各フォルダ直下のフラット運用**（サブフォルダを作らない）。
+`index.py` / `lint.py` の走査は `*.md` 非再帰なので、サブフォルダに置いたページは
+index にも lint にも載らず、事実上いないものとして扱われる。
+
 ## frontmatter スキーマ（全ページ必須）
 
 ```yaml
 ---
-type: concept | note | page | synthesis | source | index
+type: concept | note | page | qa | synthesis | source | index
 genre: <ジャンル slug>          # index.py のグルーピングキー
 summary: "12〜30字の1行要約"     # index.py がそのまま index.md に出す
 tags: []
@@ -49,4 +53,4 @@ lint の最小必須は `type:` と `created:`。index を綺麗に出すには 
 ## 禁止事項
 
 - frontmatter なしページ／相対パス wikilink／`sources/` 内の本文改変（frontmatter メタのみ可）
-- index.md の手書き（必ず `python meta/index.py` で再生成）
+- index.md の手書き（必ず `/llm-wiki:lint`＝`scripts/index.py` で再生成）

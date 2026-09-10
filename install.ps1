@@ -197,6 +197,25 @@ if (-not $PY) {
 }
 Write-Host ("[OK] Python: {0}  ({1})" -f (& $PY --version 2>&1), $PY)
 
+# hooks/hooks.json は ${CLAUDE_PLUGIN_ROOT} 相対の静的定義なので、解決済みインタプリタの
+# パスを埋め込めず python を直接呼ぶ。py ランチャーしか無い PC では SessionStart / Stop が
+# 黙って失敗し、蓄積方針の注入も当日スタブ生成も起きない。$PY が py でも「動いた」ように
+# 見えてしまうため、ここで python 単独が使えるかを必ず突き合わせる。
+$pythonCmdOk = $false
+try {
+  $pv = & python --version 2>&1
+  $pythonCmdOk = ($LASTEXITCODE -eq 0 -and "$pv" -match "Python 3")
+} catch { $pythonCmdOk = $false }
+if (-not $pythonCmdOk) {
+  Write-Host ("[!!] コマンド名 python では Python 3 を起動できません（今回は {0} を使用）。" -f $PY) -ForegroundColor Yellow
+  Write-Host '     フックは python を直接呼ぶため、このままでは SessionStart / Stop が動きません。'
+  Write-Host '     →「蓄積方針が出ない」「inbox に当日ファイルができない」状態になります。'
+  Write-Host '     対処: install.bat -InstallPython で PATH 付きの Python を入れる'
+  Write-Host '           もしくは python.exe のあるフォルダを PATH に追加する'
+  Write-Host '           Microsoft Store のエイリアスが横取りしている場合は'
+  Write-Host '           設定 > アプリ > アプリ実行エイリアス で python.exe を OFF にする'
+}
+
 # ============ 1.5) 変換ライブラリ（inbox の pptx/xlsx/docx/pdf 対応） ============
 # 失敗してもインストール全体は続行する。無くても txt/csv/html は変換でき、
 # PDF は ingest 時に Claude が直接読めるため、ここで止める価値がない。
@@ -241,14 +260,26 @@ if ($havePluginCli) {
 
   # 終了コードだけを信じず、実際の登録状態を正とする。
   # （導入済みの場合 install は "already installed" と出して 0 を返すが、--config は反映される）
+  # ただし plugin list の表示書式に依存すると、書式変更で誤って「登録失敗」と出る。
+  # Claude Code 側の状態ファイルとも突き合わせ、どちらでも確認できないときは
+  # install の終了コードを見て「NG」ではなく「確認できず」に落とす。
   $listed = (& claude plugin list 2>&1 | Out-String)
-  $pluginRegistered = [bool]($listed -match "llm-wiki@llm-wiki-marketplace")
+  $stateFile = Join-Path $HOME ".claude/plugins/installed_plugins.json"
+  $stateHit = $false
+  if (Test-Path $stateFile) {
+    $stateHit = [bool]((Get-Content $stateFile -Raw) -match "llm-wiki@llm-wiki-marketplace")
+  }
+  $pluginRegistered = ($stateHit -or ($listed -match "llm-wiki"))
 
   if ($pluginRegistered) {
     Write-Host "[OK] プラグイン登録＋vault_root 設定を確認" -ForegroundColor Green
     if ($installExit -ne 0) {
       Write-Host "[!!] install が非0終了でした。vault_root が反映されていない可能性があります" -ForegroundColor Yellow
     }
+  } elseif ($installExit -eq 0) {
+    $pluginRegistered = $true      # install 自体は成功。表示書式が変わっただけの可能性が高い
+    Write-Host "[??] install は成功しましたが登録状態を確認できませんでした（表示書式の変更？）" -ForegroundColor Yellow
+    Write-Host "     再起動後に  claude plugin list  で llm-wiki が居ることを目視確認してください。"
   } else {
     Write-Host "[NG] プラグイン登録に失敗しました（vault_root が未設定のままです）" -ForegroundColor Red
   }
@@ -281,6 +312,9 @@ Write-Host "    （起動済みのセッションには vault_root も環境変�
 Write-Host "      デスクトップアプリはタスクトレイに常駐している場合があるので終了しきること）"
 Write-Host "  ・確認: claude plugin list  → llm-wiki@llm-wiki-marketplace が enabled であること"
 Write-Host "  ・確認: Claude Code で /llm-wiki:lint が動けば成功"
+if (-not $pythonCmdOk) {
+  Write-Host "  ・コマンド名 python が使えないため、フック（自動蓄積）は動きません。上の対処を先に" -ForegroundColor Yellow
+}
 if (-not $NoDocLibs -and -not $docLibsOk) {
   Write-Host "  ・変換ライブラリが未導入です。pptx/xlsx/docx を inbox で扱うには上記 pip を実行してください" -ForegroundColor Yellow
 }

@@ -263,7 +263,7 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
 <p><code>install.bat</code> が成功しても、<strong>すでに起動している Claude Code には反映されない</strong>。</p>
 <ul>
   <li>プラグインの <code>vault_root</code>（userConfig）はセッション起動時に読まれる</li>
-  <li><code>LLM_WIKI_VAULT_ROOT</code> は <code>setx</code>（<code>install.ps1:143</code>）なので<strong>既存プロセスには届かない</strong></li>
+  <li><code>LLM_WIKI_VAULT_ROOT</code> は <code>setx</code> で設定するので<strong>既存プロセスには届かない</strong></li>
 </ul>
 <p>この2つが両方空だと、skill が vault を解決できず <strong>「Vault が未設定で inbox の場所が解決できない」</strong>というエラーになる。</p>
 <p>インストール後の確認手順:</p>
@@ -273,7 +273,7 @@ CLI が無ければフォルダ生成まで行い、<strong>デスクトップ�
 claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vaultパス&gt;"</code></pre>
 <div class="callout warn">
   <span class="tag">⚠ CLI が無いPCの落とし穴</span>
-  <p><strong>claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする</strong>（<code>install.ps1:126</code>）。vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を入れるまで skill は vault を解決できない。</p>
+  <p><strong>claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする</strong>。vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を入れるまで skill は vault を解決できない。</p>
 </div>
 
 <h3 id="install-policy">2.9 蓄積方針はプラグインが配る（v0.2 以降・設定不要）</h3>
@@ -353,7 +353,7 @@ python plugins/llm-wiki/scripts/index.py      "D:/資料/LLM-Wiki"</code></pre>
 </ul>
 <p>frontmatter（全ページ）：</p>
 <pre><code>---
-type: concept | note | page | synthesis | source
+type: concept | note | page | qa | synthesis | source
 genre: &lt;ジャンル&gt;        # index のグルーピングキー
 summary: "1行要約"        # index にそのまま出る
 tags: []
@@ -385,7 +385,7 @@ updated: YYYY-MM-DD
     <tr><td><code>.html</code> <code>.htm</code></td><td>タグ除去（script/style は捨てる）</td><td>—</td></tr>
     <tr><td><code>.docx</code></td><td>見出し階層＋段落＋表を markdown 化</td><td>python-docx</td></tr>
     <tr><td><code>.xlsx</code> <code>.xlsm</code></td><td>シートごとに markdown table（<strong>数式でなく値</strong>を取る）</td><td>openpyxl</td></tr>
-    <tr><td><code>.pptx</code></td><td>スライドごとにテキスト＋発表者ノート</td><td>python-pptx</td></tr>
+    <tr><td><code>.pptx</code></td><td>スライドごとにテキスト＋表＋発表者ノート</td><td>python-pptx</td></tr>
     <tr><td><code>.pdf</code></td><td>ページごとにテキスト抽出</td><td>pypdf</td></tr>
     <tr><td><code>.doc</code> <code>.xls</code> <code>.ppt</code></td><td><strong>非対応</strong>。<code>.docx</code> 等で保存し直す</td><td>—</td></tr>
   </tbody>
@@ -401,15 +401,29 @@ updated: YYYY-MM-DD
     <li>xlsx は 1 シート 2000 行、PDF は 300 ページで打ち切る（打ち切った旨を md 内と実行ログの両方に明記）</li>
     <li>0byte・中身なしスタブは取り込まず削除される（自動蓄積フックの空足場対策）</li>
     <li>ファイル名は自由（自動蓄積分の慣習は <code>{YYYY-MM-DD}-{プロジェクト名}.md</code>）</li>
+    <li><strong>フォルダごと置いても取り込まれない</strong>。対象は <code>inbox/</code> 直下のファイルだけ。フォルダは変換もされず lint が末尾 <code>/</code> 付きで「未変換」として報告する</li>
     <li>大量にあるときは<strong>ジャンル単位で小分け</strong>投入が安全。既存ページとの統合判断の精度が上がる</li>
   </ul>
 </div>
 
 <h3 id="d-publish">3.5 更新・発行</h3>
-<ul>
-  <li>プラグインを直したら（開発PC）：<code>.\publish.bat "変更内容"</code> → GitHub へ push</li>
-  <li>各ユーザー側の更新：<code>/plugin marketplace update llm-wiki-marketplace</code></li>
-</ul>
+<p>プラグインのキャッシュは <strong>version 単位</strong>で作られる
+（<code>~/.claude/plugins/cache/&lt;marketplace&gt;/&lt;plugin&gt;/&lt;version&gt;/</code>）。
+version を据え置いたまま push すると、利用者側は <code>marketplace update</code> しても<strong>古いコードのまま</strong>になる。</p>
+<ol>
+  <li>中身を直す</li>
+  <li><strong>version を2箇所とも上げる</strong>（同じ値にすること）
+    <ul>
+      <li><code>plugins/llm-wiki/.claude-plugin/plugin.json</code> の <code>version</code></li>
+      <li><code>.claude-plugin/marketplace.json</code> の該当プラグインの <code>version</code></li>
+    </ul>
+  </li>
+  <li><code>.\publish.bat "変更内容"</code> → GitHub へ push
+    （<code>tools/check_version.py</code> が「2箇所の一致」と「<code>plugins/</code> に差分があるのに据え置き」を検査して止める）</li>
+  <li>各ユーザー側の更新：<code>/plugin marketplace update llm-wiki-marketplace</code> → <strong>Claude Code を再起動</strong></li>
+  <li>反映確認：<code>claude plugin list</code> の version、または
+    <code>~/.claude/plugins/installed_plugins.json</code> の <code>version</code> が上がっていること</li>
+</ol>
 
 <h3 id="d-trouble">3.6 注意点・トラブルシュート</h3>
 <div class="tablewrap"><table>
@@ -419,6 +433,7 @@ updated: YYYY-MM-DD
     <tr><td>プラグインが <code>failed to load: Duplicate hooks</code></td><td>plugin.json に <code>hooks</code>/<code>skills</code> を書かない（標準dirが自動ロード）</td></tr>
     <tr><td>同じ inbox に空スタブが二重生成</td><td>旧 global Stopフック（<code>~/.claude/hooks/save_learnings.py</code>）を settings.json から外す</td></tr>
     <tr><td>Python 導入直後に <code>python</code> が見つからない</td><td>新しいシェルを開くか、<code>-InstallPython</code> 経由なら同一セッションで PATH 再読込済み</td></tr>
+    <tr><td><strong>蓄積方針が出ない／inbox に当日ファイルができない</strong></td><td>フック（<code>hooks.json</code>）は <code>python</code> を直接呼ぶ。<code>py</code> ランチャーしか無い・Microsoft Store のエイリアスが横取りしている PC では SessionStart/Stop が黙って失敗する。<code>install.bat -InstallPython</code> で PATH 付き Python を入れるか、<code>python.exe</code> を PATH に通す（設定 &gt; アプリ &gt; アプリ実行エイリアス で <code>python.exe</code> を OFF）。インストーラが検出して警告する</td></tr>
     <tr><td>private repo で <code>marketplace add</code> 失敗</td><td>各PCで <code>gh auth login</code>＋<code>gh auth setup-git</code>、HTTPSはフルURL指定</td></tr>
     <tr><td>private + HTTPS で自動更新されない</td><td>背景更新は認証が効かない。手動 <code>marketplace update</code>／SSH運用／<code>CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1</code></td></tr>
     <tr><td>lint が当日 inbox スタブを挙げる</td><td>「想定内」区分で失敗に数えない。翌日フックが自動掃除</td></tr>

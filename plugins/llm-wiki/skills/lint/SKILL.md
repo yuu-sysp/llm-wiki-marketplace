@@ -16,7 +16,7 @@ description: LLM Wiki の健全性を検査し index を再生成する。赤リ
    ```
    python "${CLAUDE_PLUGIN_ROOT}/scripts/index.py"
    ```
-3. 検出項目のうち **機械的に直せるもの**（赤リンクの [[]] 誤用→backtick化、arphan→リンク追加）は
+3. 検出項目のうち **機械的に直せるもの**（赤リンクの [[]] 誤用→backtick化、孤立ページ→リンク追加）は
    直接修正してよい。**判断が要るもの**（矛盾・missing-page 新規作成の是非）は
    `_proposals/` に提案として残すか、ユーザーに確認する。
 4. 意図的に残す赤リンク（将来ページ化予定）は `meta/lint-ignore.txt` に1行追加する。

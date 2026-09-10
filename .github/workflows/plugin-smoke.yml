@@ -1,0 +1,95 @@
+name: plugin-smoke
+
+# lint.py は exit code で健全性を返す設計（CI 前提）。発行前に壊れを機械的に止める。
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: スクリプトが構文エラーなくコンパイルできる
+        run: python -m compileall -q plugins/llm-wiki/scripts tools
+
+      - name: manifest の version が2箇所で一致している
+        run: python tools/check_version.py .
+
+      - name: 空 vault を作って index 再生成 → lint が exit 0
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-empty"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          python plugins/llm-wiki/scripts/lint.py "$VAULT"
+
+      - name: 孤立ページを検出できる（index.md に打ち消されない回帰テスト）
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-orphan"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          cat > "$VAULT/concepts/A.md" <<'EOF'
+          ---
+          type: concept
+          genre: test
+          summary: リンク元
+          created: 2026-01-01
+          ---
+          # A
+          [[B]] を参照する
+          EOF
+          cat > "$VAULT/concepts/B.md" <<'EOF'
+          ---
+          type: concept
+          genre: test
+          summary: 被リンクあり
+          created: 2026-01-01
+          ---
+          # B
+          EOF
+          cat > "$VAULT/concepts/C.md" <<'EOF'
+          ---
+          type: concept
+          genre: test
+          summary: どこからも参照されない
+          created: 2026-01-01
+          ---
+          # C
+          EOF
+          # index.md は全ページを列挙する。これで孤立が消えないことを確かめる。
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > lint.out || true
+          cat lint.out
+          if ! grep -q "concepts/C.md" lint.out; then
+            echo "NG: 孤立ページ C を検出できていない"; exit 1
+          fi
+          if grep -q "concepts/B.md" lint.out; then
+            echo "NG: 被リンクありの B を孤立と誤検出"; exit 1
+          fi
+          echo "OK: 孤立検出は index.md に打ち消されていない"
+
+      - name: frontmatter の必須キー判定が部分一致で通らない
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-fm"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          cat > "$VAULT/concepts/D.md" <<'EOF'
+          ---
+          doctype: concept
+          genre: test
+          summary: type: を部分一致で満たしてしまう罠
+          created: 2026-01-01
+          ---
+          # D
+          EOF
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > fm.out || true
+          cat fm.out
+          if ! grep -q "欠落: type:" fm.out; then
+            echo "NG: doctype: が type: として通ってしまった"; exit 1
+          fi
+          echo "OK: 行頭一致で判定できている"

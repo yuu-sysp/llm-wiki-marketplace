@@ -77,7 +77,7 @@ def main() -> int:
         "",
         f"最終更新: {TODAY}",
         "",
-        "> このファイルは `python meta/index.py` で自動生成されます。**手で編集しないでください。**",
+        "> このファイルは lint スキル（`/llm-wiki:lint`）が `scripts/index.py` で自動生成します。**手で編集しないでください。**",
         "> 1行説明は各ページ frontmatter の `summary:` を編集してください。",
         "",
     ]

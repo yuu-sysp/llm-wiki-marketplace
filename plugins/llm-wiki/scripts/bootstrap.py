@@ -43,6 +43,7 @@ SEEDS = [
     ("lint-ignore.txt", "meta/lint-ignore.txt"),
     ("template-concept.md", "meta/template-concept.md"),
     ("template-page.md", "meta/template-page.md"),
+    ("template-qa.md", "meta/template-qa.md"),
 ]
 
 

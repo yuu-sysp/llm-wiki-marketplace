@@ -1,6 +1,6 @@
 ---
 name: init
-description: LLM Wiki の vault を初期化する。フォルダ構成（concepts/notes/pages/inbox/sources/meta/_proposals）と meta 雛形（index/log/rules/lint-ignore/templates）を冪等生成する。「wiki init」「wiki を初期化」で起動。
+description: LLM Wiki の vault を初期化する。フォルダ構成（concepts/notes/pages/qa/inbox/sources/sources/_attachments/meta/_proposals）と meta 雛形（index/log/rules/lint-ignore/templates）を冪等生成する。「wiki init」「wiki を初期化」で起動。
 ---
 
 # LLM Wiki: init（vault 初期化）

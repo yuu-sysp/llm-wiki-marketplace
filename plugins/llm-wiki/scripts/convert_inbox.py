@@ -224,25 +224,41 @@ def conv_pptx(path: Path):
         raise MissingLib("python-pptx")
 
     prs = Presentation(str(path))
-    out, n = [], 0
+    out, n, n_tbl = [], 0, 0
     for i, slide in enumerate(prs.slides, 1):
         n = i
         out.append(f"## Slide {i}")
-        texts = []
+        texts, tables = [], []
         for shape in slide.shapes:
+            # 表は GraphicFrame で has_text_frame が False。拾わないと
+            # 「表や図を後から確認できる」という取り込みの前提が崩れる。
+            if getattr(shape, "has_table", False):
+                rows = [[c.text for c in row.cells] for row in shape.table.rows]
+                table = md_table(rows)
+                if table:
+                    tables.append(table)
+                    n_tbl += 1
+                continue
             if not shape.has_text_frame:
                 continue
             for para in shape.text_frame.paragraphs:
                 t = "".join(run.text for run in para.runs).strip()
                 if t:
                     texts.append(t)
-        out.append("\n".join(texts) if texts else "_（テキストなし）_")
+        if texts:
+            out.append("\n".join(texts))
+        out.extend(tables)
+        if not texts and not tables:
+            out.append("_（テキストなし）_")
 
         if slide.has_notes_slide:
             note = (slide.notes_slide.notes_text_frame.text or "").strip()
             if note:
                 out.append("> **ノート**: " + note.replace("\n", "\n> "))
-    return "\n\n".join(out), f"{n} スライド"
+    label = f"{n} スライド"
+    if n_tbl:
+        label += f" / 表 {n_tbl}"
+    return "\n\n".join(out), label
 
 
 def conv_pdf(path: Path):
@@ -297,11 +313,14 @@ def main() -> int:
         print(f"inbox がありません: {inbox}（bootstrap.py を先に実行してください）")
         return 2
 
-    targets = sorted(p for p in inbox.iterdir()
+    entries = [p for p in inbox.iterdir() if not p.name.startswith(".")]
+    targets = sorted(p for p in entries
                      if p.is_file()
-                     and p.suffix.lower() != ".md"
-                     and not p.name.startswith("."))
-    if not targets:
+                     and p.suffix.lower() != ".md")
+    # フォルダは再帰しない（どの階層を1ページ相当と見なすかが決められないため）。
+    # 黙って無視すると「置いたのに取り込まれない」になるので、スキップとして必ず出す。
+    dirs = sorted(p.name for p in entries if p.is_dir())
+    if not targets and not dirs:
         return 0                                   # 対象なしは静かに終了（毎回走るため）
 
     attachments = vault / "sources" / "_attachments"
@@ -309,6 +328,8 @@ def main() -> int:
 
     print(f"LLM-Wiki convert-inbox  (vault: {vault})")
     converted, skipped, missing = [], [], set()
+    for d in dirs:
+        skipped.append((d + "/", "フォルダは対象外。中のファイルを inbox 直下へ出してください"))
 
     for src in targets:
         suffix = src.suffix.lower()

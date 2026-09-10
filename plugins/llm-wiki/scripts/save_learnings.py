@@ -20,6 +20,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _vault import resolve_vault  # noqa: E402
 
+# Claude Code は stdin へ UTF-8 で書くが、Windows の CPython は stdin をロケール既定
+# （日本語環境では cp932）で読む。固定しないと非 ASCII の cwd が化けて
+# `2026-08-27-MGMES02隗｣隱ｬ.md` のようなファイル名になり、cp932 にできないバイト列なら
+# 例外で cwd 自体を失って `-unknown.md` になる。
+try:
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
 
 

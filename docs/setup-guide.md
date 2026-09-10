@@ -142,7 +142,7 @@ irm https://claude.ai/install.ps1 | iex
 `install.bat` が成功しても、**すでに起動している Claude Code には反映されない**。
 
 - プラグインの `vault_root`（userConfig）はセッション起動時に読まれる
-- `LLM_WIKI_VAULT_ROOT` は `setx`（`install.ps1:143`）なので**既存プロセスには届かない**
+- `LLM_WIKI_VAULT_ROOT` は `setx` で設定するので**既存プロセスには届かない**
 
 この2つが両方空だと、skill が vault を解決できず
 **「Vault が未設定で inbox の場所が解決できない」**というエラーになる。
@@ -160,7 +160,7 @@ claude plugin marketplace add <このリポジトリのパス or GitHub URL>
 claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=<vaultパス>"
 ```
 
-> ⚠ **claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする**（`install.ps1:126`）。
+> ⚠ **claude CLI が無いPCでは、install.ps1 はプラグイン登録をスキップする**。
 > vault フォルダだけ作られて「完了」と表示されるため成功したように見えるが、
 > GUI 登録（2.6）で `vault_root` を入れるまで skill は vault を解決できない。
 
@@ -247,7 +247,7 @@ python plugins/llm-wiki/scripts/index.py      "D:/資料/LLM-Wiki"
 frontmatter（全ページ）:
 ```yaml
 ---
-type: concept | note | page | synthesis | source
+type: concept | note | page | qa | synthesis | source
 genre: <ジャンル>        # index のグルーピングキー
 summary: "1行要約"        # index にそのまま出る
 tags: []
@@ -280,7 +280,7 @@ pptx・xlsx・docx・pdf などもそのまま置ける（自動で md に変換
 | `.html` `.htm` | タグ除去（script/style は捨てる） | — |
 | `.docx` | 見出し階層＋段落＋表を markdown 化 | python-docx |
 | `.xlsx` `.xlsm` | シートごとに markdown table（**数式でなく値**を取る） | openpyxl |
-| `.pptx` | スライドごとにテキスト＋発表者ノート | python-pptx |
+| `.pptx` | スライドごとにテキスト＋表＋発表者ノート | python-pptx |
 | `.pdf` | ページごとにテキスト抽出 | pypdf |
 | `.doc` `.xls` `.ppt` | **非対応**。`.docx` 等で保存し直す | — |
 
@@ -301,11 +301,23 @@ python plugins/llm-wiki/scripts/convert_inbox.py "<vaultパス>"
 - xlsx は 1 シート 2000 行、PDF は 300 ページで打ち切る（打ち切った旨を md 内と実行ログの両方に明記）
 - 0byte・中身なしスタブは取り込まず削除される（自動蓄積フックの空足場対策）
 - ファイル名は自由（自動蓄積分の慣習は `{YYYY-MM-DD}-{プロジェクト名}.md`）
+- **フォルダごと置いても取り込まれない**。対象は `inbox/` 直下のファイルだけ。フォルダは変換もされず lint が末尾 `/` 付きで「未変換」として報告する
 - 大量にあるときは**ジャンル単位で小分け**投入が安全。既存ページとの統合判断の精度が上がる
 
 ### 3.5 更新・発行
-- プラグインを直したら（開発PC）：`.\publish.bat "変更内容"` → GitHub へ push
-- 各ユーザー側の更新：`/plugin marketplace update llm-wiki-marketplace`
+
+プラグインのキャッシュは **version 単位**で作られる（`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`）。
+version を据え置いたまま push すると、利用者側は `marketplace update` しても**古いコードのまま**になる。
+
+1. 中身を直す
+2. **version を2箇所とも上げる**（同じ値にすること）
+   - `plugins/llm-wiki/.claude-plugin/plugin.json` の `version`
+   - `.claude-plugin/marketplace.json` の該当プラグインの `version`
+3. `.\publish.bat "変更内容"` → GitHub へ push
+   （`tools/check_version.py` が「2箇所の一致」と「`plugins/` に差分があるのに据え置き」を検査して止める）
+4. 各ユーザー側の更新：`/plugin marketplace update llm-wiki-marketplace` → **Claude Code を再起動**
+5. 反映確認：`claude plugin list` の version、または
+   `~/.claude/plugins/installed_plugins.json` の `version` が上がっていること
 
 ### 3.6 注意点・トラブルシュート
 | 症状 | 原因・対処 |
@@ -314,6 +326,7 @@ python plugins/llm-wiki/scripts/convert_inbox.py "<vaultパス>"
 | プラグインが `failed to load: Duplicate hooks` | plugin.json に `hooks`/`skills` を書かない（標準dirが自動ロード） |
 | 同じ inbox に空スタブが二重生成 | 旧 global Stopフック（`~/.claude/hooks/save_learnings.py`）を settings.json から外す |
 | Python 導入直後に `python` が見つからない | 新しいシェルを開くか、`-InstallPython` 経由なら同一セッションで PATH 再読込済み |
+| **蓄積方針が出ない／inbox に当日ファイルができない** | フック（`hooks.json`）は `python` を直接呼ぶ。`py` ランチャーしか無い・Microsoft Store のエイリアスが横取りしている PC では SessionStart/Stop が黙って失敗する。`install.bat -InstallPython` で PATH 付き Python を入れるか、`python.exe` を PATH に通す（設定 > アプリ > アプリ実行エイリアス で `python.exe` を OFF）。インストーラが検出して警告する |
 | private repo で `marketplace add` 失敗 | 各PCで `gh auth login`＋`gh auth setup-git`、HTTPSはフルURL指定 |
 | private + HTTPS で自動更新されない | 背景更新は認証が効かない。手動 `marketplace update`／SSH運用／`CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` |
 | lint が当日 inbox スタブを挙げる | 「想定内」区分で失敗に数えない。翌日フックが自動掃除 |
