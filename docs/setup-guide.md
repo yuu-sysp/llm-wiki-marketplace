@@ -315,9 +315,21 @@ version を据え置いたまま push すると、利用者側は `marketplace u
    - `.claude-plugin/marketplace.json` の該当プラグインの `version`
 3. `.\publish.bat "変更内容"` → GitHub へ push
    （`tools/check_version.py` が「2箇所の一致」と「`plugins/` に差分があるのに据え置き」を検査して止める）
-4. 各ユーザー側の更新：`/plugin marketplace update llm-wiki-marketplace` → **Claude Code を再起動**
-5. 反映確認：`claude plugin list` の version、または
-   `~/.claude/plugins/installed_plugins.json` の `version` が上がっていること
+4. 各ユーザー側の更新は**2段階**。`marketplace update` はマーケットプレイス定義を取り直すだけで、
+   **インストール済みプラグインは更新されない**（`install` も「already installed」で何もしない）。
+   ```powershell
+   claude plugin marketplace update llm-wiki-marketplace   # 定義を取り直す
+   claude plugin update llm-wiki@llm-wiki-marketplace      # 本体を新 version へ
+   ```
+   → **Claude Code を再起動**（"Restart to apply changes" と出る）
+5. 反映確認：`~/.claude/plugins/installed_plugins.json` の `version` が上がっていること
+   （`installPath` も `.../<新version>/` に変わる）
+
+発行前に手元で検証するなら:
+```powershell
+claude plugin validate .                       # marketplace.json
+claude plugin validate plugins\llm-wiki        # plugin.json
+```
 
 ### 3.6 注意点・トラブルシュート
 | 症状 | 原因・対処 |
@@ -330,6 +342,7 @@ version を据え置いたまま push すると、利用者側は `marketplace u
 | private repo で `marketplace add` 失敗 | 各PCで `gh auth login`＋`gh auth setup-git`、HTTPSはフルURL指定 |
 | private + HTTPS で自動更新されない | 背景更新は認証が効かない。手動 `marketplace update`／SSH運用／`CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` |
 | lint が当日 inbox スタブを挙げる | 「想定内」区分で失敗に数えない。翌日フックが自動掃除 |
+| **更新したのに古い挙動のまま** | ①`marketplace update` だけではプラグイン本体は更新されない → `claude plugin update llm-wiki@llm-wiki-marketplace` を叩く ②発行側で version を上げ忘れているとキャッシュ（`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`）が切り替わらない → 3.5 |
 | **「Vault が未設定で inbox の場所が解決できない」** | vault の解決経路が両方空。①`claude plugin list` に `llm-wiki@llm-wiki-marketplace` が居るか確認 → 無ければ再インストール ②**Claude Code を完全終了して再起動**（`setx` も userConfig も起動済みプロセスには届かない）。詳細は 2.8 |
 | インストーラは「完了」と出たのに skill が vault を見つけない | CLI が無い環境では install.ps1 が**プラグイン登録をスキップ**する（vault フォルダだけ作って完了する）。GUI 登録（2.6）で `vault_root` を必ず入力する |
 | pptx/xlsx/docx が「未導入でスキップ」される | 変換ライブラリが無い。`pip install python-docx openpyxl python-pptx pypdf`（3.4）。オフライン環境なら install 時に `-NoDocLibs` |

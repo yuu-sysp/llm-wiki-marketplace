@@ -420,10 +420,18 @@ version を据え置いたまま push すると、利用者側は <code>marketpl
   </li>
   <li><code>.\publish.bat "変更内容"</code> → GitHub へ push
     （<code>tools/check_version.py</code> が「2箇所の一致」と「<code>plugins/</code> に差分があるのに据え置き」を検査して止める）</li>
-  <li>各ユーザー側の更新：<code>/plugin marketplace update llm-wiki-marketplace</code> → <strong>Claude Code を再起動</strong></li>
-  <li>反映確認：<code>claude plugin list</code> の version、または
-    <code>~/.claude/plugins/installed_plugins.json</code> の <code>version</code> が上がっていること</li>
+  <li>各ユーザー側の更新は<strong>2段階</strong>。<code>marketplace update</code> はマーケットプレイス定義を
+    取り直すだけで、<strong>インストール済みプラグインは更新されない</strong>
+    （<code>install</code> も「already installed」で何もしない）。
+<pre><code>claude plugin marketplace update llm-wiki-marketplace   # 定義を取り直す
+claude plugin update llm-wiki@llm-wiki-marketplace      # 本体を新 version へ</code></pre>
+    → <strong>Claude Code を再起動</strong>（"Restart to apply changes" と出る）</li>
+  <li>反映確認：<code>~/.claude/plugins/installed_plugins.json</code> の <code>version</code> が上がっていること
+    （<code>installPath</code> も <code>.../&lt;新version&gt;/</code> に変わる）</li>
 </ol>
+<p>発行前に手元で検証するなら:</p>
+<pre><code>claude plugin validate .                       # marketplace.json
+claude plugin validate plugins\llm-wiki        # plugin.json</code></pre>
 
 <h3 id="d-trouble">3.6 注意点・トラブルシュート</h3>
 <div class="tablewrap"><table>
@@ -437,6 +445,7 @@ version を据え置いたまま push すると、利用者側は <code>marketpl
     <tr><td>private repo で <code>marketplace add</code> 失敗</td><td>各PCで <code>gh auth login</code>＋<code>gh auth setup-git</code>、HTTPSはフルURL指定</td></tr>
     <tr><td>private + HTTPS で自動更新されない</td><td>背景更新は認証が効かない。手動 <code>marketplace update</code>／SSH運用／<code>CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1</code></td></tr>
     <tr><td>lint が当日 inbox スタブを挙げる</td><td>「想定内」区分で失敗に数えない。翌日フックが自動掃除</td></tr>
+    <tr><td><strong>更新したのに古い挙動のまま</strong></td><td>①<code>marketplace update</code> だけではプラグイン本体は更新されない → <code>claude plugin update llm-wiki@llm-wiki-marketplace</code> を叩く ②発行側で version を上げ忘れているとキャッシュ（<code>~/.claude/plugins/cache/&lt;marketplace&gt;/&lt;plugin&gt;/&lt;version&gt;/</code>）が切り替わらない → 3.5</td></tr>
     <tr><td><strong>「Vault が未設定で inbox の場所が解決できない」</strong></td><td>vault の解決経路が両方空。①<code>claude plugin list</code> に <code>llm-wiki@llm-wiki-marketplace</code> が居るか確認 → 無ければ再インストール ②<strong>Claude Code を完全終了して再起動</strong>（<code>setx</code> も userConfig も起動済みプロセスには届かない）。詳細は <a href="#install-restart">2.8</a></td></tr>
     <tr><td>インストーラは「完了」と出たのに skill が vault を見つけない</td><td>CLI が無い環境では install.ps1 が<strong>プラグイン登録をスキップ</strong>する（vault フォルダだけ作って完了する）。GUI 登録（<a href="#install-desktop">2.6</a>）で <code>vault_root</code> を必ず入力する</td></tr>
     <tr><td>pptx/xlsx/docx が「未導入でスキップ」される</td><td>変換ライブラリが無い。<code>pip install python-docx openpyxl python-pptx pypdf</code>（<a href="#d-ingest">3.4</a>）。オフライン環境なら install 時に <code>-NoDocLibs</code></td></tr>

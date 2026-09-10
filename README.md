@@ -31,7 +31,13 @@ git remote add origin https://github.com/yuu-sysp/llm-wiki-marketplace.git   # �
 publish.bat  "変更内容"      # メッセージは必ずダブルクォートで囲む
 ```
 
-導入済みPCの更新は `/plugin marketplace update llm-wiki-marketplace`。
+導入済みPCの更新は**2段階**（`marketplace update` だけではプラグイン本体は変わらない）:
+
+```
+claude plugin marketplace update llm-wiki-marketplace   # マーケットプレイス定義を取り直す
+claude plugin update llm-wiki@llm-wiki-marketplace      # プラグイン本体を新 version へ
+```
+実行後は **Claude Code を再起動**する。
 
 ## 導入（新規PC）
 
