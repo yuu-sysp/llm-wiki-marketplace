@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# リポジトリ直下に置いたローカル配布用の HTML コピー。
+# publish.bat は git add -A するため、除外しないと同じ資料が二重に発行される。
+# 発行するのは docs/ 配下のものだけ（正は docs/install-guide.html）。
+/*.html
