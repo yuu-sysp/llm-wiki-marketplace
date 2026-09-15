@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import resolve_vault  # noqa: E402
+from _vault import is_stub, resolve_vault  # noqa: E402
 
 # Claude Code は stdin へ UTF-8 で書くが、Windows の CPython は stdin をロケール既定
 # （日本語環境では cp932）で読む。固定しないと非 ASCII の cwd が化けて
@@ -30,19 +30,6 @@ except Exception:
     pass
 
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
-
-
-def is_stub(text: str) -> bool:
-    body = text
-    if body.lstrip().startswith("---"):
-        parts = body.split("---", 2)
-        if len(parts) == 3:
-            body = parts[2]
-    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
-    lines = [ln for ln in body.splitlines()
-             if ln.strip() and not ln.lstrip().startswith("#")
-             and not ln.strip().startswith("project:")]
-    return len(lines) == 0
 
 
 def main() -> int:

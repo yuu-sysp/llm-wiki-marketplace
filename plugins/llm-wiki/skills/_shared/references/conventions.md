@@ -16,7 +16,7 @@
 | `inbox/`    | 未処理ソースの投入口（処理後 sources/ へ移動、または削除）。pptx/xlsx/docx/pdf 等も置ける（`convert_inbox.py` が md 化する） |
 | `sources/`  | 取り込み済みの生ソース（原文保持・改変禁止） |
 | `sources/_attachments/` | 変換元のバイナリ原本（pptx/xlsx/pdf 等）。md からは `` `sources/_attachments/<名前>` `` と backtick で参照する（`[[ ]]` にすると赤リンクになる） |
-| `meta/`     | index.md / log.md / rules.md / lint-ignore.txt / テンプレート |
+| `meta/`     | index.md・keywords.md（**自動生成**）/ log.md / rules.md / lint-ignore.txt / テンプレート |
 | `_proposals/` | lint/curiosity の修正提案（pending → applied/rejected） |
 
 `concepts/ notes/ pages/ qa/` は**各フォルダ直下のフラット運用**（サブフォルダを作らない）。
@@ -40,6 +40,10 @@ updated: YYYY-MM-DD              # 更新時のみ変える。created は不変
 
 lint の最小必須は `type:` と `created:`。index を綺麗に出すには `genre` と `summary` も入れる。
 
+`tags` は **検索の当たりを決める**。`keywords.md`（語 → ページの索引）はここから作られるので、
+ページ名に出ない語を入れる: 略語・別名（`mgmes02`）、テーブル名・クラス名、
+エラーコード、ライブラリ名。ページ名の繰り返しは入れない（索引が太るだけ）。
+
 ## リンク（Obsidian wikilink）
 
 - ページ参照: `[[ページ名]]`（相対パス不可・スラッシュ不可）
@@ -53,4 +57,4 @@ lint の最小必須は `type:` と `created:`。index を綺麗に出すには 
 ## 禁止事項
 
 - frontmatter なしページ／相対パス wikilink／`sources/` 内の本文改変（frontmatter メタのみ可）
-- index.md の手書き（必ず `/llm-wiki:lint`＝`scripts/index.py` で再生成）
+- index.md / keywords.md の手書き（必ず `/llm-wiki:lint`＝`scripts/index.py` で再生成。手で直しても次回消える）

@@ -93,3 +93,94 @@ jobs:
             echo "NG: doctype: が type: として通ってしまった"; exit 1
           fi
           echo "OK: 行頭一致で判定できている"
+
+      - name: keywords.md が tags と識別子を拾い、節ラベルを落とす
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-kw"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          for n in 1 2 3 4; do
+            cat > "$VAULT/concepts/P$n.md" <<EOF
+          ---
+          type: concept
+          genre: test
+          summary: テスト$n
+          tags: [mgmes02, kw$n]
+          created: 2026-01-01
+          ---
+          # P$n
+
+          ## 確認方法
+
+          ## TENMST（店）
+          EOF
+          done
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          KW="$VAULT/meta/keywords.md"
+          cat "$KW"
+          if ! grep -q '^- mgmes02 ' "$KW"; then echo "NG: 共有 tag が無い"; exit 1; fi
+          if ! grep -q '^- kw1 ' "$KW"; then echo "NG: 固有 tag が無い"; exit 1; fi
+          if ! grep -q '^- TENMST' "$KW"; then echo "NG: 識別子見出しを拾えていない"; exit 1; fi
+          if grep -q '^- 確認方法' "$KW"; then echo "NG: 節ラベルを落とせていない"; exit 1; fi
+          echo "OK: keywords.md の抽出規則が効いている"
+
+      - name: keywords.md が孤立ページ検出を壊さない
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-kw-orphan"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          cat > "$VAULT/concepts/Lonely.md" <<'EOF'
+          ---
+          type: concept
+          genre: test
+          summary: どこからも参照されない
+          tags: [lonely]
+          created: 2026-01-01
+          ---
+          # Lonely
+          EOF
+          # keywords.md も全ページを列挙するので、lint の走査に混ざると孤立が消える
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > kw.out || true
+          if ! grep -q "concepts/Lonely.md" kw.out; then
+            echo "NG: keywords.md が孤立ページ検出を打ち消している"; exit 1
+          fi
+          echo "OK: 孤立検出は keywords.md の影響を受けていない"
+
+      - name: inbox 滞留が閾値を超えたときだけ SessionStart に出る
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-backlog"
+          TODAY=$(date +%F)
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          # 中身なしスタブは毎日フックが作るもの。これだけで催促してはいけない
+          cat > "$VAULT/inbox/$TODAY-proj.md" <<'EOF'
+          # stub
+
+          ## 学んだこと
+
+          <!-- ここに追記 -->
+          EOF
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" > q.out
+          if grep -q '^inbox:' q.out; then
+            echo "NG: 空スタブだけで催促している"; cat q.out; exit 1
+          fi
+          # 中身ありが 3 件そろったら出る
+          for n in a b c; do
+            cat > "$VAULT/inbox/$TODAY-$n.md" <<'EOF'
+          # メモ
+
+          実際の内容がある
+          EOF
+          done
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" > l.out
+          cat l.out
+          if ! grep -q '^inbox: 未処理 3件' l.out; then
+            echo "NG: 滞留 3 件を報告していない"; exit 1
+          fi
+          if ! grep -q 'llm-wiki:ingest' l.out; then
+            echo "NG: 対処コマンドを案内していない"; exit 1
+          fi
+          # インストーラ経路（--quiet-policy）では出さない
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy > i.out
+          if grep -q '^inbox:' i.out; then
+            echo "NG: --quiet-policy でも催促が出ている"; exit 1
+          fi
+          echo "OK: 閾値と --quiet-policy が効いている"

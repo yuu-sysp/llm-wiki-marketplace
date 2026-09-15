@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
+from _vault import pending_inbox, print_unresolved_hint, resolve_vault  # noqa: E402
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -38,6 +38,7 @@ DIRS = ["concepts", "notes", "pages", "qa", "inbox", "sources",
 # (テンプレファイル名, vault内の配置先相対パス)
 SEEDS = [
     ("meta-index.md", "meta/index.md"),
+    ("meta-keywords.md", "meta/keywords.md"),
     ("meta-log.md", "meta/log.md"),
     ("rules.md", "meta/rules.md"),
     ("lint-ignore.txt", "meta/lint-ignore.txt"),
@@ -68,9 +69,41 @@ skill: /llm-wiki:save 保存 · ingest 取込 · query 検索 · lint 検査＋i
 =="""
 
 
+# inbox 滞留を知らせる閾値。件数か日数のどちらかを超えたときだけ1行出す。
+# 毎回出すと「今日1件置いただけ」でも催促になりノイズ化するため。
+BACKLOG_MIN_COUNT = 3
+BACKLOG_MIN_DAYS = 7
+
+
+def backlog_line(vault: Path):
+    """inbox の滞留を1行にする。閾値未満・判定不能なら None（＝何も出さない）。
+
+    自動蓄積は「溜める」側しか自動化されていない。片付け（ingest）は人が思い出した
+    ときだけなので、放っておくと数十日分が積む。SessionStart は毎回 context に載る
+    唯一の場所なので、ここで残量を見せて ingest を促す。
+    """
+    try:
+        pending = pending_inbox(vault)
+        if not pending:
+            return None
+        oldest_path, oldest_day = min(pending, key=lambda x: x[1])
+        days = (datetime.now() - datetime.strptime(oldest_day, "%Y-%m-%d")).days
+        if len(pending) < BACKLOG_MIN_COUNT and days < BACKLOG_MIN_DAYS:
+            return None
+        return (f"inbox: 未処理 {len(pending)}件"
+                f"（最古 {days}日前: {oldest_path.name}）→ /llm-wiki:ingest を検討")
+    except Exception:
+        return None                      # 滞留表示のためにセッションを止めない
+
+
 def print_policy(vault: Path) -> None:
     # 区切り文字を混在させない（`D:\x/inbox/` のような表示を避ける）
-    print(POLICY.format(vault=vault.as_posix(), date=TODAY))
+    text = POLICY.format(vault=vault.as_posix(), date=TODAY)
+    line = backlog_line(vault)
+    if line:
+        # 末尾の `==` の直前に差し込み、方針ブロックの中に収める
+        text = text.rstrip("=\n").rstrip() + "\n" + line + "\n=="
+    print(text)
 
 
 def main() -> int:

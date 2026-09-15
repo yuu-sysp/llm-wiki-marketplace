@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
+from _vault import is_stub, print_unresolved_hint, resolve_vault  # noqa: E402
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
@@ -62,20 +62,6 @@ def frontmatter_block(text: str) -> str:
     return parts[1] if len(parts) >= 3 else None
 
 
-def is_stub(text: str) -> bool:
-    """frontmatter・見出し・project行・HTMLコメント・空行のみなら中身なしスタブ。"""
-    body = text
-    if body.lstrip().startswith("---"):
-        parts = body.split("---", 2)
-        if len(parts) == 3:
-            body = parts[2]
-    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
-    lines = [ln for ln in body.splitlines()
-             if ln.strip() and not ln.lstrip().startswith("#")
-             and not ln.strip().startswith("project:")]
-    return len(lines) == 0
-
-
 def main() -> int:
     root = resolve_vault()
     if root is None:
@@ -115,6 +101,7 @@ def main() -> int:
         # index.md は index.py が全ページを機械的に列挙して作る。これを被リンク集合に
         # 混ぜると全ページが必ず「参照済み」になり、孤立ページ検出が恒久的に 0 件になる。
         # 赤リンク（index が指す先が実在しない）は見たいので、走査自体からは外さない。
+        # 同じ理由で meta/keywords.md も scan に入れないこと（あれも全ページを列挙する）。
         from_index = (f == idx)
         for m in LINK_RE.finditer(read(f)):
             tgt = link_target(m.group(1))

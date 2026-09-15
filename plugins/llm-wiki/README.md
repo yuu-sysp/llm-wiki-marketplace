@@ -9,13 +9,13 @@ Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。現行運用�
 |---|---|---|
 | skill | `skills/{init,save,ingest,query,lint}` | ユーザー操作（`/llm-wiki:<name>`） |
 | skill参照 | `skills/_shared/references/` | 記述規約・判断基準 |
-| hook | `hooks/hooks.json` | SessionStart=bootstrap(足場冪等生成＋**蓄積方針の注入**) / Stop=save_learnings(当日スタブ確保＋空スタブ掃除) |
+| hook | `hooks/hooks.json` | SessionStart=bootstrap(足場冪等生成＋**蓄積方針の注入**＋inbox滞留の通知) / Stop=save_learnings(当日スタブ確保＋空スタブ掃除) |
 | script | `scripts/lint.py` | 決定論的 lint（赤リンク/孤立/空/frontmatter/inbox） |
-| script | `scripts/index.py` | frontmatter から index.md 自動生成（ドリフト根治） |
+| script | `scripts/index.py` | `meta/index.md`（genre別一覧）と `meta/keywords.md`（語→ページ索引）を自動生成 |
 | script | `scripts/bootstrap.py` | vault フォルダ構成＋meta雛形の冪等生成／SessionStart で蓄積方針を出力（`--quiet-policy` で抑止） |
 | script | `scripts/convert_inbox.py` | inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は `sources/_attachments/` へ退避） |
 | script | `scripts/save_learnings.py` | Stop フック本体 |
-| script | `scripts/_vault.py` | vault ルート解決（引数→環境変数） |
+| script | `scripts/_vault.py` | vault ルート解決（引数→環境変数）と inbox のスタブ／未処理判定 |
 | template | `templates/` | ページ・meta の雛形 |
 
 ## 依存
@@ -60,6 +60,42 @@ v0.1 では方針が各利用者の `~/.claude/CLAUDE.md` にしか無く、新�
 SessionStart で毎回 context に載るため、**行数は最小限に保つこと**。
 
 利用者側の `~/.claude/CLAUDE.md` に vault パスや方針を書く必要はない（書くと特定PC依存になる）。
+
+## 検索索引（`meta/keywords.md`）
+
+`index.md` に載るのはページ名と summary だけなので、略語・テーブル名・エラーコードからは辿れない。
+`keywords.md` は **語 → ページ** の逆引き索引で、query の grep フォールバックを減らす。
+
+材料は2つ:
+
+- **frontmatter の `tags`** … 人が明示した語。索引の主体なので、ページ名に出ない語
+  （略語・別名・テーブル名・ライブラリ名）を入れる。
+- **本文見出しのうち識別子らしいもの** … `TENMST` `runtimeconfig.json` `ProcessTmjbfil` など。
+  「英数字で始まり日本語2文字以下」で判定する。`確認方法` `関連` のような節ラベルは日本語主体
+  なので自動的に外れる。手書きの除外リストは腐るので持たない。
+
+出現ページ数での足切りはしない。よく使うテーブル名ほど多くのページに出るため、頻度で落とすと
+最も検索される語から消える（節ラベル対策は識別子判定が担う）。1語あたりのページ数だけ
+`KEYWORD_MAX_PAGES`（既定4）で打ち切る。`wpf`（実測56ページ）のような大分類は全件並べても
+絞り込めないので件数だけ示す。
+
+> サイズの目安: 186ページ・360タグの vault で約 36KB（`index.md` は約 20KB）。
+> ページ数にほぼ比例するので、数百ページ規模になったら `KEYWORD_MAX_PAGES` を下げるか
+> genre 別に分割する。
+
+## inbox 滞留の通知
+
+自動蓄積は「溜める」側だけが自動で、片付け（ingest）は人が思い出したときだけ。放っておくと
+数十日分が積む。SessionStart は毎回 context に載る唯一の場所なので、そこに1行だけ出す。
+
+```
+inbox: 未処理 14件（最古 39日前: 2026-08-07-MGMESTEST.md）→ /llm-wiki:ingest を検討
+```
+
+- 「未処理」= 中身のある `.md` ／ 非 md（未変換）／ フォルダ。**中身なしスタブは数えない**
+  （Stop フックが毎日作るものなので、それで催促すると毎日鳴る）
+- 閾値は `BACKLOG_MIN_COUNT`（既定3件）か `BACKLOG_MIN_DAYS`（既定7日）のどちらか超過時のみ
+- インストーラ経路（`--quiet-policy`）では出さない
 
 ## 設計メモ
 

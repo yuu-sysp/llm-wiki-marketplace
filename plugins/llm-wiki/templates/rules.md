@@ -11,8 +11,10 @@
   - 冪等性のため、取込完了は frontmatter の `type: source` マーカーで示す（全処理の最後にだけ立てる）
 - 有用な回答は qa/ に保存する（**任意**。再利用価値の高いQ&Aが出たときのみ）
 - ページには YAML frontmatter を付ける（type, genre, summary, tags, related, source, created, updated）
+- `tags` には**ページ名に出ない語**を入れる（略語・テーブル名・クラス名・エラーコード）。
+  検索用の `meta/keywords.md` はここから生成されるため、tags が薄いと後で見つからない
 - 変更を加えたら `/llm-wiki:lint` を実行して健全性を確認する
-  （赤リンク・孤立・空・frontmatter・inbox の検査＋ index.md の再生成。exit 0 で健全）
+  （赤リンク・孤立・空・frontmatter・inbox の検査＋ index.md / keywords.md の再生成。exit 0 で健全）
   - スクリプトはプラグイン側にある。CLI で直接叩くなら:
     `python "<プラグイン>/scripts/lint.py" "<vault>"` / `python "<プラグイン>/scripts/index.py" "<vault>"`
   - **vault の meta/ にはスクリプトを置かない**（プラグイン更新から取り残されるため）
