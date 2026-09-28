@@ -229,6 +229,11 @@ claude plugin update llm-wiki@llm-wiki-marketplace</code></pre>
     <h4>Claude Code を再起動する</h4>
     <p class="verify"><b>確認</b><code>~\.claude\plugins\installed_plugins.json</code> の <code>version</code> と <code>installPath</code> が新しい版に変わっていること。</p>
   </li>
+  <li>
+    <h4>（v0.4.0 以前から上げた場合のみ）ページ雛形を作り直す</h4>
+    <p>v0.4.0 以前は vault の <code>meta/template-*.md</code> の日付が初期化した日で固定されていた。vault の <code>meta/</code> から <code>template-concept.md</code> / <code>template-page.md</code> / <code>template-qa.md</code> の3つを削除し、Claude Code で <code>/llm-wiki:init</code> を実行する（他のファイルは上書きされない）。</p>
+    <p class="verify"><b>確認</b>作り直した雛形の <code>created:</code> が <code>{{DATE}}</code> になっていること。</p>
+  </li>
 </ol>
 
 <h2>直したものを配る（発行側）</h2>
@@ -238,13 +243,13 @@ claude plugin update llm-wiki@llm-wiki-marketplace</code></pre>
 </div>
 <ol class="steps">
   <li>
-    <h4>version を2箇所とも同じ値に上げる</h4>
-    <p><code>plugins/llm-wiki/.claude-plugin/plugin.json</code> と <code>.claude-plugin/marketplace.json</code>。</p>
+    <h4>version を3箇所とも同じ値に上げる</h4>
+    <p><code>plugins/llm-wiki/.claude-plugin/plugin.json</code> と <code>.claude-plugin/marketplace.json</code>、この手順書（<code>docs/install-guide.html</code>）冒頭の版表記。</p>
   </li>
   <li>
     <h4>発行する</h4>
 <pre><code>.\publish.bat "変更内容"     # メッセージは必ずダブルクォートで囲む</code></pre>
-    <p class="verify"><b>確認</b>version の不一致・上げ忘れは <code>publish.bat</code> が検出して発行を止める。push 後は GitHub Actions（plugin-smoke）が green になること。</p>
+    <p class="verify"><b>確認</b>version の不一致・上げ忘れ・手順書の版表記の古さは <code>publish.bat</code> が検出して発行を止める。push 後は GitHub Actions（plugin-smoke）が green になること。</p>
   </li>
 </ol>
 
@@ -256,6 +261,7 @@ claude plugin update llm-wiki@llm-wiki-marketplace</code></pre>
   <tr><td>蓄積方針が出ない／inbox に当日ファイルができない</td><td>フックが呼ぶ <code>python</code> が使えない。<code>-InstallPython</code> で導入するか PATH を通す。Microsoft Store のエイリアスが横取りしている場合は「設定 &gt; アプリ &gt; アプリ実行エイリアス」で <code>python.exe</code> を OFF にする</td></tr>
   <tr><td>更新したのに古い挙動のまま</td><td>①<code>plugin update</code> を叩いていない ②発行側が version を上げ忘れている</td></tr>
   <tr><td>lint に「inbox 未変換」が出る</td><td>非 md が残っている。<code>/llm-wiki:ingest</code> が変換する。末尾 <code>/</code> はフォルダなので中のファイルを inbox 直下へ出す。<code>.doc/.xls/.ppt</code> は <code>.docx</code> 等で保存し直す</td></tr>
+  <tr><td>新しく作ったページの <code>created</code> が毎回同じ古い日付になる</td><td>v0.4.0 以前に初期化した vault の雛形が日付固定になっている。上の「更新する」手順 3 で雛形を作り直す</td></tr>
   <tr><td>lint が当日の inbox スタブを挙げる</td><td>想定内。失敗には数えない（翌日フックが自動で掃除する）</td></tr>
   <tr><td><code>.bat</code> が「指定されたファイルが見つかりません」</td><td>.bat は ASCII＋CRLF 必須。UTF-8/LF で保存すると cmd.exe が誤動作する</td></tr>
 </table></div>
@@ -265,7 +271,7 @@ claude plugin update llm-wiki@llm-wiki-marketplace</code></pre>
   <li><code>/llm-wiki:save</code> … 直前の会話の知見をページ化する</li>
   <li><code>/llm-wiki:ingest</code> … <code>inbox/</code> の資料（pptx/xlsx/docx/pdf も可）を取り込む</li>
   <li><code>/llm-wiki:query</code> … Wiki を検索して出典付きで答える</li>
-  <li><code>/llm-wiki:lint</code> … 赤リンク・孤立ページ・inbox 残りを検査し index を再生成する</li>
+  <li><code>/llm-wiki:lint</code> … index と keywords（語→ページの検索索引）を再生成し、赤リンク・孤立ページ・inbox 残りを検査する</li>
   <li><code>/llm-wiki:init</code> … vault の足場を作り直す（既存ファイルは上書きしない）</li>
 </ul>
 <p>普通に開発しているだけで、知見は <code>inbox/{日付}-{プロジェクト名}.md</code> に溜まっていく。区切りで <code>/llm-wiki:ingest</code> を叩けばページになる。</p>

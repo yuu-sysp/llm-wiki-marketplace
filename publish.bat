@@ -4,9 +4,10 @@ REM
 REM   publish.bat "what you changed"      <- ALWAYS quote the whole message
 REM
 REM One-time first: git remote add origin https://github.com/yuu-sysp/llm-wiki-marketplace.git
-REM Before publishing, bump "version" in BOTH of these (clients cache per version):
+REM Before publishing, bump "version" in ALL of these (clients cache per version):
 REM   plugins/llm-wiki/.claude-plugin/plugin.json
 REM   .claude-plugin/marketplace.json
+REM   docs/install-guide.html  (the vX.Y.Z badge at the top)
 setlocal
 cd /d "%~dp0"
 

@@ -433,14 +433,15 @@ updated: YYYY-MM-DD
 version を据え置いたまま push すると、利用者側は <code>marketplace update</code> しても<strong>古いコードのまま</strong>になる。</p>
 <ol>
   <li>中身を直す</li>
-  <li><strong>version を2箇所とも上げる</strong>（同じ値にすること）
+  <li><strong>version を3箇所とも上げる</strong>（同じ値にすること）
     <ul>
       <li><code>plugins/llm-wiki/.claude-plugin/plugin.json</code> の <code>version</code></li>
       <li><code>.claude-plugin/marketplace.json</code> の該当プラグインの <code>version</code></li>
+      <li><code>docs/install-guide.html</code> 冒頭の版表記（<code>&lt;span&gt;vX.Y.Z&lt;/span&gt;</code>）</li>
     </ul>
   </li>
   <li><code>.\publish.bat "変更内容"</code> → GitHub へ push
-    （<code>tools/check_version.py</code> が「2箇所の一致」と「<code>plugins/</code> に差分があるのに据え置き」を検査して止める）</li>
+    （<code>tools/check_version.py</code> が「3箇所の一致」と「<code>plugins/</code> に差分があるのに据え置き」を検査して止める）</li>
   <li>各ユーザー側の更新は<strong>2段階</strong>。<code>marketplace update</code> はマーケットプレイス定義を
     取り直すだけで、<strong>インストール済みプラグインは更新されない</strong>
     （<code>install</code> も「already installed」で何もしない）。

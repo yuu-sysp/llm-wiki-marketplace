@@ -24,8 +24,9 @@
 
 1. `plugins/llm-wiki/.claude-plugin/plugin.json` の `version`
 2. `.claude-plugin/marketplace.json` の該当プラグインの `version`
+3. `docs/install-guide.html` 冒頭の版表記（`<span>vX.Y.Z</span>`）
 
-の**2箇所**を同じ値に上げてから発行する（`publish.bat` が一致と bump を検査して止める）。
+の**3箇所**を同じ値に上げてから発行する（`publish.bat` が一致と bump を検査して止める）。
 
 ```
 git remote add origin https://github.com/yuu-sysp/llm-wiki-marketplace.git   # 初回のみ

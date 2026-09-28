@@ -334,11 +334,12 @@ python plugins/llm-wiki/scripts/convert_inbox.py "<vaultパス>"
 version を据え置いたまま push すると、利用者側は `marketplace update` しても**古いコードのまま**になる。
 
 1. 中身を直す
-2. **version を2箇所とも上げる**（同じ値にすること）
+2. **version を3箇所とも上げる**（同じ値にすること）
    - `plugins/llm-wiki/.claude-plugin/plugin.json` の `version`
    - `.claude-plugin/marketplace.json` の該当プラグインの `version`
+   - `docs/install-guide.html` 冒頭の版表記（`<span>vX.Y.Z</span>`）
 3. `.\publish.bat "変更内容"` → GitHub へ push
-   （`tools/check_version.py` が「2箇所の一致」と「`plugins/` に差分があるのに据え置き」を検査して止める）
+   （`tools/check_version.py` が「3箇所の一致」と「`plugins/` に差分があるのに据え置き」を検査して止める）
 4. 各ユーザー側の更新は**2段階**。`marketplace update` はマーケットプレイス定義を取り直すだけで、
    **インストール済みプラグインは更新されない**（`install` も「already installed」で何もしない）。
    ```powershell
