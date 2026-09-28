@@ -4,8 +4,11 @@
 
 検出項目:
   1. 赤リンク       : [[リンク]] 先ファイルが存在しない（lint-ignore.txt で許容可）
+                     コードブロック／インラインコード内の [[ ]] は対象外。
+                     ![[画像.png]] や [[資料.pdf]] のような添付は vault 内のファイル名で存在確認する。
+                     ページ名の照合は Obsidian と同じく大文字小文字を区別しない。
   2. 孤立ページ     : どこからも [[リンク]] されていない content ファイル
-  3. 空ファイル     : 0byte の .md
+  3. 空ファイル     : 0byte の .md（inbox は 5. で扱うので除く）
   4. frontmatter欠落: 先頭が --- でない / 必須キー欠落
   5. inbox残存/空スタブ: 未処理ファイル・中身なしスタブ（当日は想定内）
   6. inbox未変換    : 非 md ファイル・フォルダ（convert_inbox.py 待ち。ingest は *.md しか見ない）
@@ -16,14 +19,13 @@ vault ルートは argv[1] → 環境変数の順で解決（_vault.resolve_vaul
 """
 import re
 import sys
-from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import is_stub, print_unresolved_hint, resolve_vault  # noqa: E402
-
-TODAY = datetime.now().strftime("%Y-%m-%d")
-DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
+from _vault import (  # noqa: E402
+    is_before_today, is_stub, print_unresolved_hint, read_text, resolve_vault,
+    split_frontmatter, strip_code,
+)
 
 # Windows コンソール(cp932)でも UTF-8 出力（em-dash 等でのクラッシュ防止）
 try:
@@ -33,7 +35,7 @@ except Exception:
 
 # 各フォルダ直下のフラット運用（サブフォルダは走査しない＝index にも lint にも載らない）。
 CONTENT_DIRS = ["concepts", "pages", "notes", "qa"]     # リンク対象になるフォルダ
-LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+LINK_RE = re.compile(r"(!?)\[\[([^\]]+)\]\]")
 REQUIRED_FM = ("type", "created")                        # 拡張frontmatterの最小必須
 
 
@@ -42,24 +44,9 @@ def link_target(raw: str) -> str:
     return raw.split("|")[0].split("#")[0].strip()
 
 
-def read(p: Path) -> str:
-    try:
-        return p.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return p.read_text(encoding="cp932", errors="replace")
-
-
 def has_fm_key(block: str, key: str) -> bool:
     """行頭一致で判定する。部分一致だと `doctype:` が `type:` を満たしてしまう。"""
     return re.search(rf"^\s*{re.escape(key)}\s*:", block, re.M) is not None
-
-
-def frontmatter_block(text: str) -> str:
-    """先頭 --- ... --- の中身を返す。無ければ None。"""
-    if not text.lstrip().startswith("---"):
-        return None
-    parts = text.split("---", 2)
-    return parts[1] if len(parts) >= 3 else None
 
 
 def main() -> int:
@@ -82,14 +69,25 @@ def main() -> int:
         if not f.exists():
             return set()
         out = set()
-        for ln in read(f).splitlines():
+        for ln in read_text(f).splitlines():
             s = ln.strip()
             if s and not s.startswith("#"):
                 out.add(s)
         return out
 
-    valid = {p.stem for p in content_files()}
-    ignore = load_ignore()
+    # Obsidian はリンク先を大文字小文字無視で解決する。Windows のファイルシステムも同様。
+    valid = {p.stem.lower() for p in content_files()}
+    ignore = {s.lower() for s in load_ignore()}
+
+    # 添付（画像・PDF 等）はどのフォルダにあっても Obsidian が名前で解決する
+    def vault_files():
+        for p in root.rglob("*"):
+            if p.is_file() and ".obsidian" not in p.parts:
+                yield p
+    files = set()
+    for p in vault_files():
+        files.add(p.name.lower())
+        files.add(p.relative_to(root).as_posix().lower())
     referenced = set()
     broken = []          # 要対応
     broken_known = []    # 既知・無視
@@ -103,26 +101,38 @@ def main() -> int:
         # 赤リンク（index が指す先が実在しない）は見たいので、走査自体からは外さない。
         # 同じ理由で meta/keywords.md も scan に入れないこと（あれも全ページを列挙する）。
         from_index = (f == idx)
-        for m in LINK_RE.finditer(read(f)):
-            tgt = link_target(m.group(1))
+        for m in LINK_RE.finditer(strip_code(read_text(f))):
+            embed, tgt = m.group(1) == "!", link_target(m.group(2))
             if not tgt:
                 continue
-            if not from_index:
-                referenced.add(tgt)
-            if tgt not in valid:
-                rec = (f.relative_to(root).as_posix(), tgt)
-                (broken_known if tgt in ignore else broken).append(rec)
+            key = tgt.lower()
+            if key.endswith(".md"):
+                key = key[:-3]
+            if key in valid:
+                if not from_index:
+                    referenced.add(key)
+                continue
+            # ページ名にはドットを含むもの（`runtimeconfig.json`）があるので、ページ照合の後で判定する
+            if embed or Path(key).suffix:
+                if key in files:
+                    continue
+            rec = (f.relative_to(root).as_posix(), tgt)
+            (broken_known if key in ignore else broken).append(rec)
 
     orphans = sorted(p.relative_to(root).as_posix()
-                     for p in content_files() if p.stem not in referenced)
+                     for p in content_files() if p.stem.lower() not in referenced)
 
+    # inbox の 0byte は下の inbox 節（当日＝想定内／過去日＝要対応）で扱う。ここにも数えると
+    # 当日の想定内スタブが「空ファイル（要対応）」として二重に計上される。
     empties = sorted(p.relative_to(root).as_posix()
                      for p in root.rglob("*.md")
-                     if ".obsidian" not in p.parts and p.stat().st_size == 0)
+                     if ".obsidian" not in p.parts
+                     and p.relative_to(root).parts[0] != "inbox"
+                     and p.stat().st_size == 0)
 
     fm_bad = []
     for p in content_files():
-        block = frontmatter_block(read(p))
+        block, _ = split_frontmatter(read_text(p))
         rel = p.relative_to(root).as_posix()
         if block is None:
             fm_bad.append((rel, "先頭が --- でない / frontmatter欠落"))
@@ -154,14 +164,10 @@ def main() -> int:
     inbox_raw = inbox_unconverted()
 
     def _is_stub(f):
-        return f.stat().st_size == 0 or is_stub(read(f))
+        return f.stat().st_size == 0 or is_stub(read_text(f))
 
-    def _before_today(f):
-        m = DATE_RE.match(f.name)
-        return bool(m) and m.group(1) < TODAY
-
-    inbox_stub_old = [f.name for f in inbox_files if _is_stub(f) and _before_today(f)]
-    inbox_stub_today = [f.name for f in inbox_files if _is_stub(f) and not _before_today(f)]
+    inbox_stub_old = [f.name for f in inbox_files if _is_stub(f) and is_before_today(f.name)]
+    inbox_stub_today = [f.name for f in inbox_files if _is_stub(f) and not is_before_today(f.name)]
     inbox_real = [f.name for f in inbox_files if not _is_stub(f)]
 
     def section(title, items, fmt):

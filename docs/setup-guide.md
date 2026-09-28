@@ -48,7 +48,7 @@ cd llm-wiki-marketplace
    Claude Code で `/llm-wiki:lint` が動けば完了
 
 Python が無いPCは `.\install.bat -InstallPython`。
-詳細・GUIのみの環境・トラブル時は以下 2.1〜2.9 を参照。
+詳細・GUIのみの環境・トラブル時は以下 2.1〜2.10 を参照。
 
 > 人に配る用の短い手順書として `docs/install-guide.html` がある（導入3経路・更新・トラブルのみ）。
 > このファイル単体で完結するので、そのまま送ってよい。
@@ -173,8 +173,8 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=<vault�
 
 | 部品 | 役割 |
 |---|---|
-| Stop フック `save_learnings.py` | 当日 `inbox/{日付}-{プロジェクト}.md` の**空の足場**を用意 |
-| SessionStart フック `bootstrap.py` | 「いつ・何を・どこへ書くか」の**蓄積方針を context に注入** |
+| Stop フック `save_learnings.py` | 当日 `inbox/{日付}-{プロジェクト}.md` の**空の足場**を用意（＋過去日の空スタブ掃除） |
+| SessionStart フック `bootstrap.py` | 「いつ・何を・どこへ書くか」の**蓄積方針を context に注入**。同じ当日足場もここで用意する（v0.4.1〜。最初のターンから追記先がある） |
 
 v0.1 では方針が各利用者の `~\.claude\CLAUDE.md` にしか無く、新規インストールでは
 **毎日空のスタブが生成されるだけで誰も埋めない**状態だった。v0.2 でプラグイン側から配る。
@@ -193,6 +193,26 @@ v0.1 では方針が各利用者の `~\.claude\CLAUDE.md` にしか無く、新�
 
 インストーラは `--quiet-policy` 付きで `bootstrap.py` を呼ぶので、導入ログには方針が出ない。
 
+### 2.10 inbox 滞留の通知と検索索引（v0.4 以降）
+
+**inbox 滞留の通知** — 自動化されているのは「溜める」側だけで、片付け（ingest）は人が思い出したとき
+だけ。そこで SessionStart の方針ブロックに、溜まりすぎたときだけ1行出す。
+
+```
+inbox: 未処理 14件（最古 39日前: 2026-08-07-MGMESTEST.md）→ /llm-wiki:ingest を検討
+```
+
+- 「未処理」= 中身のある `.md` ／ 非 md（未変換）／ フォルダ。**中身なしスタブは数えない**
+- 未処理が 3 件以上、または最古が 7 日以上前のときだけ出る（`bootstrap.py` の `BACKLOG_MIN_COUNT` / `BACKLOG_MIN_DAYS`）
+
+**検索索引 `meta/keywords.md`** — `index.md` はページ名と summary だけなので、略語・テーブル名・
+エラーコードからは辿れない。`index.py` が **語 → ページ** の逆引き索引も作り、`/llm-wiki:query` は
+まずここを引く。
+
+- 材料は frontmatter の `tags` と、本文見出しのうち識別子らしいもの（`TENMST` `runtimeconfig.json` 等）
+- コードブロック内の `## コメント` は見出しとして拾わない
+- `index.md` と同じく**自動生成・手書き禁止**。語を増やすときはページの `tags:` に足して `/llm-wiki:lint`
+
 ---
 
 ## ③ 解説（仕組みと使い方）
@@ -202,12 +222,13 @@ v0.1 では方針が各利用者の `~\.claude\CLAUDE.md` にしか無く、新�
 [Claude Code + プラグイン]                 [vault（あなたの知識・Obsidianで開く）]
   skills  init/save/ingest/query/lint   ──▶  concepts/ notes/ pages/ qa/
   hooks   SessionStart=bootstrap             inbox/  … 自動蓄積＋資料の投入口
-          (足場生成＋蓄積方針の注入)                   (pptx/xlsx/pdf も置ける)
+          (足場生成＋蓄積方針の注入                    (pptx/xlsx/pdf も置ける)
+           ＋当日足場＋inbox滞留の通知)
           Stop=save_learnings(当日足場)
   scripts lint.py / index.py /               sources/… 生ログ保全
           bootstrap.py / save_learnings.py            _attachments/ … 変換元の原本
-          convert_inbox.py                   meta/   … index.md(自動生成) log rules
-                                                       lint-ignore.txt template
+          convert_inbox.py                   meta/   … index.md keywords.md(自動生成)
+                                                       log rules lint-ignore.txt template
                                              _proposals/ … 提案(将来)
         userConfig: vault_root ───────────────┘（このパスで両者が結びつく）
 ```
@@ -219,10 +240,10 @@ v0.1 では方針が各利用者の `~\.claude\CLAUDE.md` にしか無く、新�
 | skill `ingest` | inbox の取り込み（Phase 0 変換 → A/B・完了マーカー） |
 | skill `query` | Wiki を段階検索して出典付き回答 |
 | skill `lint` | 健全性検査＋index 再生成 |
-| hook SessionStart | `bootstrap.py`：フォルダ構成を冪等生成 |
+| hook SessionStart | `bootstrap.py`：フォルダ構成を冪等生成＋蓄積方針の注入＋当日足場＋inbox 滞留の通知 |
 | hook Stop | `save_learnings.py`：当日足場を用意＋過去日の空スタブ掃除 |
-| script `lint.py` | 赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code） |
-| script `index.py` | 各ページ frontmatter から index.md を自動生成 |
+| script `lint.py` | 赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code）。コード内の `[[ ]]` は対象外、`![[画像]]` は実在確認 |
+| script `index.py` | 各ページ frontmatter から index.md（genre 別一覧）と keywords.md（語→ページ索引）を自動生成 |
 | script `convert_inbox.py` | inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は `sources/_attachments/` へ） |
 
 ### 3.2 設定項目
@@ -241,11 +262,11 @@ python plugins/llm-wiki/scripts/index.py      "D:/資料/LLM-Wiki"
 ```
 
 ### 3.3 日常の使い方
-- 普通に開発する → Stopフックが `inbox/{日付}-{PJ}.md` に足場を用意（知見はここに追記されていく）
+- 普通に開発する → SessionStart / Stop フックが `inbox/{日付}-{PJ}.md` に足場を用意（知見はここに追記されていく）
 - `/llm-wiki:save` … 会話の知見を concepts/notes/pages へ整理
 - `/llm-wiki:ingest` … inbox をまとめてページ化（Phase A/B）
 - `/llm-wiki:query` … Wiki を検索して回答
-- `/llm-wiki:lint` … 壊れチェック＋index 再生成（変更後は必ず）
+- `/llm-wiki:lint` … index / keywords 再生成＋壊れチェック（変更後は必ず）
 
 frontmatter（全ページ）:
 ```yaml

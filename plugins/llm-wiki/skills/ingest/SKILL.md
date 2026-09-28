@@ -28,7 +28,9 @@ pptx / xlsx / docx / pdf / txt / csv / html を md 化し、原本は `sources/_
 
 ## Phase A（収集・分類）
 
-1. `inbox/*.md` を一覧。**0byte・中身なしスタブは処理せず削除**する。
+1. `inbox/*.md` を一覧。**過去日の 0byte・中身なしスタブは処理せず削除**する。
+   **当日（今日の日付プレフィックス）の空スタブは消さない** — 作業中のセッションの追記先であり、
+   消してもフックが作り直すだけ。lint でも「当日＝想定内」として失敗件数に数えない。
 2. 各ファイルを読み、trigger 種別ごとにキーポイントを抽出。
 3. ソース原文を `sources/<genre>/` へ移動（frontmatter にメタ付与、**本文は無加工**）。
 
@@ -46,5 +48,5 @@ pptx / xlsx / docx / pdf / txt / csv / html を md 化し、原本は `sources/_
    python "${CLAUDE_PLUGIN_ROOT}/scripts/index.py"   # index 再生成
    python "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"    # 健全性（inbox が空か含む）
    ```
-   inbox が空・lint が exit 0 になるまでクローズしない。
+   inbox が空（当日の空スタブのみ残るのは可）・lint が exit 0 になるまでクローズしない。
    lint の「inbox 未変換ファイル」は Phase 0 の対象漏れ。残っていたら上の扱いに従う。

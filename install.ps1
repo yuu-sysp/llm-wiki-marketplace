@@ -289,6 +289,13 @@ if ($havePluginCli) {
 Write-Host "`n--- vault 生成 ---"
 # --quiet-policy: 蓄積方針の出力は SessionStart フック用。インストーラのログには不要
 & $PY (Join-Path $RepoRoot "plugins\llm-wiki\scripts\bootstrap.py") "$VaultRoot" --quiet-policy
+# 失敗（書込権限なし・ドライブ不在など）を見逃すと「完了」と出たまま vault が無い状態になる
+$bootstrapOk = ($LASTEXITCODE -eq 0) -and (Test-Path (Join-Path $VaultRoot "meta\index.md"))
+if (-not $bootstrapOk) {
+  Write-Host ("[NG] vault の生成に失敗しました: {0}" -f $VaultRoot) -ForegroundColor Red
+  Write-Host "     保存先に書き込めるか（権限・ドライブの有無）を確認して再実行してください。"
+  exit 1
+}
 
 # ============ 5) 環境変数（スタンドアロン実行のフォールバック） ============
 setx LLM_WIKI_VAULT_ROOT "$VaultRoot" | Out-Null

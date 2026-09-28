@@ -49,6 +49,8 @@ echo === Published ===
 echo On a new PC, install with:
 echo   /plugin marketplace add yuu-sysp/llm-wiki-marketplace
 echo   /plugin install llm-wiki@llm-wiki-marketplace
-echo On PCs that already have it, update with:
-echo   /plugin marketplace update llm-wiki-marketplace
+echo On PCs that already have it, update in TWO steps, then restart Claude Code:
+echo   claude plugin marketplace update llm-wiki-marketplace
+echo   claude plugin update llm-wiki@llm-wiki-marketplace
+echo   (marketplace update alone does NOT update the plugin itself)
 endlocal

@@ -15,7 +15,7 @@
 | `qa/`       | Q&Aアーカイブ（任意。再利用価値が高いときのみ） |
 | `inbox/`    | 未処理ソースの投入口（処理後 sources/ へ移動、または削除）。pptx/xlsx/docx/pdf 等も置ける（`convert_inbox.py` が md 化する） |
 | `sources/`  | 取り込み済みの生ソース（原文保持・改変禁止） |
-| `sources/_attachments/` | 変換元のバイナリ原本（pptx/xlsx/pdf 等）。md からは `` `sources/_attachments/<名前>` `` と backtick で参照する（`[[ ]]` にすると赤リンクになる） |
+| `sources/_attachments/` | 変換元のバイナリ原本（pptx/xlsx/pdf 等）。md からは `` `sources/_attachments/<名前>` `` と backtick で参照する（パス入り `[[ ]]` は規約違反） |
 | `meta/`     | index.md・keywords.md（**自動生成**）/ log.md / rules.md / lint-ignore.txt / テンプレート |
 | `_proposals/` | lint/curiosity の修正提案（pending → applied/rejected） |
 
@@ -46,13 +46,19 @@ lint の最小必須は `type:` と `created:`。index を綺麗に出すには 
 
 ## リンク（Obsidian wikilink）
 
-- ページ参照: `[[ページ名]]`（相対パス不可・スラッシュ不可）
+- ページ参照: `[[ページ名]]`（相対パス不可・スラッシュ不可。大文字小文字は区別されない）
 - 別名: `[[ページ名|表示]]` / セクション: `[[ページ名#見出し]]`
 - クラス名・ライブラリ名など「ページにしないもの」は `[[ ]]` で囲まず `` `backtick` `` にする（赤リンク量産を防ぐ）
+- ソースの出典は `` `sources/<genre>/<ファイル名>` `` と backtick で書く（`[[sources/...]]` はスラッシュ入りで不可）
+- コードブロック・インラインコード内の `[[ ]]` はリンク扱いされない（bash の `[[ -f x ]]` 等はそのまま書いてよい）
+- 画像などの埋め込み `![[名前.png]]` は、vault 内に同名ファイルがあれば lint を通る
 
 ## 日付
 
-- 実時刻を使う（`date +%Y-%m-%d`）。新規は `created = updated = 今日`、更新時は `updated` のみ。
+- 実時刻を使う（bash: `date +%Y-%m-%d` ／ PowerShell: `Get-Date -Format yyyy-MM-dd`）。
+  新規は `created = updated = 今日`、更新時は `updated` のみ。
+- `meta/template-*.md` の `{{DATE}}` はページを作るときに今日の日付へ置き換える
+  （雛形側は `{{DATE}}` のまま保つ）。
 
 ## 禁止事項
 

@@ -118,6 +118,7 @@
         <li><a href="#install-vault">vault の保存先（Dドライブ不要）</a></li>
         <li><a href="#install-restart">インストール後は再起動（重要）</a></li>
   <li><a href="#install-policy">蓄積方針はプラグインが配る（設定不要）</a></li>
+        <li><a href="#install-backlog">inbox 滞留の通知と検索索引</a></li>
       </ol>
     </li>
     <li><a href="#detail">解説（仕組みと使い方）</a>
@@ -182,7 +183,7 @@ cd llm-wiki-marketplace
     <li><strong>Claude Code を完全に終了して起動し直す</strong> ← ★これを飛ばすと必ず失敗する（<a href="#install-restart">2.8</a>）</li>
     <li><code>claude plugin list</code> で <code>llm-wiki@llm-wiki-marketplace</code> が <code>enabled</code> なら成功。Claude Code で <code>/llm-wiki:lint</code> が動けば完了</li>
   </ol>
-  <p>Python が無いPCは <code>.\install.bat -InstallPython</code>。詳細・GUIのみの環境・トラブル時は以下 2.1〜2.9 を参照。</p>
+  <p>Python が無いPCは <code>.\install.bat -InstallPython</code>。詳細・GUIのみの環境・トラブル時は以下 2.1〜2.10 を参照。</p>
 </div>
 
 <h3 id="install-pre">2.1 前提</h3>
@@ -286,8 +287,8 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vau
 <table>
   <thead><tr><th>部品</th><th>役割</th></tr></thead>
   <tbody>
-    <tr><td>Stop フック <code>save_learnings.py</code></td><td>当日 <code>inbox/{日付}-{プロジェクト}.md</code> の<strong>空の足場</strong>を用意</td></tr>
-    <tr><td>SessionStart フック <code>bootstrap.py</code></td><td>「いつ・何を・どこへ書くか」の<strong>蓄積方針を context に注入</strong></td></tr>
+    <tr><td>Stop フック <code>save_learnings.py</code></td><td>当日 <code>inbox/{日付}-{プロジェクト}.md</code> の<strong>空の足場</strong>を用意（＋過去日の空スタブ掃除）</td></tr>
+    <tr><td>SessionStart フック <code>bootstrap.py</code></td><td>「いつ・何を・どこへ書くか」の<strong>蓄積方針を context に注入</strong>。同じ当日足場もここで用意する（v0.4.1〜。最初のターンから追記先がある）</td></tr>
   </tbody>
 </table>
 <p>v0.1 では方針が各利用者の <code>~\.claude\CLAUDE.md</code> にしか無く、新規インストールでは<strong>毎日空のスタブが生成されるだけで誰も埋めない</strong>状態だった。v0.2 でプラグイン側から配る。</p>
@@ -301,6 +302,20 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vau
 <p><strong>利用者は <code>~\.claude\CLAUDE.md</code> に何も書かなくてよい。</strong> 方針を変えたい場合は <code>plugins/llm-wiki/scripts/bootstrap.py</code> の <code>POLICY</code> を編集して再発行する（毎セッション context に載るため行数は最小限に）。</p>
 <p>インストーラは <code>--quiet-policy</code> 付きで <code>bootstrap.py</code> を呼ぶので、導入ログには方針が出ない。</p>
 
+<h3 id="install-backlog">2.10 inbox 滞留の通知と検索索引（v0.4 以降）</h3>
+<p><strong>inbox 滞留の通知</strong> — 自動化されているのは「溜める」側だけで、片付け（ingest）は人が思い出したときだけ。そこで SessionStart の方針ブロックに、溜まりすぎたときだけ1行出す。</p>
+<pre><code>inbox: 未処理 14件（最古 39日前: 2026-08-07-MGMESTEST.md）→ /llm-wiki:ingest を検討</code></pre>
+<ul>
+  <li>「未処理」= 中身のある <code>.md</code> ／ 非 md（未変換）／ フォルダ。<strong>中身なしスタブは数えない</strong></li>
+  <li>未処理が 3 件以上、または最古が 7 日以上前のときだけ出る（<code>bootstrap.py</code> の <code>BACKLOG_MIN_COUNT</code> / <code>BACKLOG_MIN_DAYS</code>）</li>
+</ul>
+<p><strong>検索索引 <code>meta/keywords.md</code></strong> — <code>index.md</code> はページ名と summary だけなので、略語・テーブル名・エラーコードからは辿れない。<code>index.py</code> が<strong>語 → ページ</strong>の逆引き索引も作り、<code>/llm-wiki:query</code> はまずここを引く。</p>
+<ul>
+  <li>材料は frontmatter の <code>tags</code> と、本文見出しのうち識別子らしいもの（<code>TENMST</code> <code>runtimeconfig.json</code> 等）</li>
+  <li>コードブロック内の <code>## コメント</code> は見出しとして拾わない</li>
+  <li><code>index.md</code> と同じく<strong>自動生成・手書き禁止</strong>。語を増やすときはページの <code>tags:</code> に足して <code>/llm-wiki:lint</code></li>
+</ul>
+
 <!-- ③ 解説 -->
 <h2 id="detail">③ 解説（仕組みと使い方）</h2>
 <p class="part-note">中で何が動いているか、どう使い、どう保つか。</p>
@@ -309,11 +324,12 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vau
 <pre class="diagram"><code>[Claude Code + プラグイン]                 [vault（あなたの知識・Obsidianで開く）]
   skills  init/save/ingest/query/lint   ──▶  concepts/ notes/ pages/ qa/
   hooks   SessionStart=bootstrap             inbox/  … 自動蓄積＋資料の投入口
-          Stop=save_learnings                          (pptx/xlsx/pdf も置ける)
+          (方針注入＋当日足場＋滞留通知)               (pptx/xlsx/pdf も置ける)
+          Stop=save_learnings(当日足場)
   scripts lint.py / index.py /               sources/… 生ログ保全
           bootstrap.py / save_learnings.py            _attachments/ … 変換元の原本
-          convert_inbox.py                   meta/   … index.md(自動生成) log rules
-                                                       lint-ignore.txt template
+          convert_inbox.py                   meta/   … index.md keywords.md(自動生成)
+                                                       log rules lint-ignore.txt template
                                              _proposals/ … 提案(将来)
         userConfig: vault_root ───────────────┘（このパスで両者が結びつく）</code></pre>
 
@@ -325,10 +341,10 @@ claude plugin install llm-wiki@llm-wiki-marketplace --config "vault_root=&lt;vau
     <tr><td>skill <code>ingest</code></td><td>inbox の取り込み（Phase 0 変換 → A/B・完了マーカー）</td></tr>
     <tr><td>skill <code>query</code></td><td>Wiki を段階検索して出典付き回答</td></tr>
     <tr><td>skill <code>lint</code></td><td>健全性検査＋index 再生成</td></tr>
-    <tr><td>hook SessionStart</td><td><code>bootstrap.py</code>：フォルダ構成を冪等生成</td></tr>
+    <tr><td>hook SessionStart</td><td><code>bootstrap.py</code>：フォルダ構成を冪等生成＋蓄積方針の注入＋当日足場＋inbox 滞留の通知</td></tr>
     <tr><td>hook Stop</td><td><code>save_learnings.py</code>：当日足場を用意＋過去日の空スタブ掃除</td></tr>
-    <tr><td>script <code>lint.py</code></td><td>赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code）</td></tr>
-    <tr><td>script <code>index.py</code></td><td>各ページ frontmatter から index.md を自動生成</td></tr>
+    <tr><td>script <code>lint.py</code></td><td>赤リンク/孤立/空/frontmatter/inbox を機械検出（exit code）。コード内の <code>[[ ]]</code> は対象外、<code>![[画像]]</code> は実在確認</td></tr>
+    <tr><td>script <code>index.py</code></td><td>各ページ frontmatter から index.md（genre 別一覧）と keywords.md（語→ページ索引）を自動生成</td></tr>
     <tr><td>script <code>convert_inbox.py</code></td><td>inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は <code>sources/_attachments/</code> へ）</td></tr>
   </tbody>
 </table></div>
@@ -350,11 +366,11 @@ python plugins/llm-wiki/scripts/index.py      "D:/資料/LLM-Wiki"</code></pre>
 
 <h3 id="d-usage">3.3 日常の使い方</h3>
 <ul>
-  <li>普通に開発する → Stopフックが <code>inbox/{日付}-{PJ}.md</code> に足場を用意（知見はここに追記されていく）</li>
+  <li>普通に開発する → SessionStart / Stop フックが <code>inbox/{日付}-{PJ}.md</code> に足場を用意（知見はここに追記されていく）</li>
   <li><code>/llm-wiki:save</code> … 会話の知見を concepts/notes/pages へ整理</li>
   <li><code>/llm-wiki:ingest</code> … inbox をまとめてページ化（Phase A/B）</li>
   <li><code>/llm-wiki:query</code> … Wiki を検索して回答</li>
-  <li><code>/llm-wiki:lint</code> … 壊れチェック＋index 再生成（変更後は必ず）</li>
+  <li><code>/llm-wiki:lint</code> … index / keywords 再生成＋壊れチェック（変更後は必ず）</li>
 </ul>
 <p>frontmatter（全ページ）：</p>
 <pre><code>---

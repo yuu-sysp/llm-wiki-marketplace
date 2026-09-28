@@ -2,44 +2,26 @@
 # -*- coding: utf-8 -*-
 """Stop フック: LLM-Wiki inbox の当日スタブ確保 ＋ 過去の空スタブ自動クリーンアップ.
 
-- 当日 `{date}-{project}.md` の足場（テンプレヘッダ）を用意する。
+- 当日 `{date}-{project}.md` の足場（テンプレヘッダ）を用意する（SessionStart でも同じものを作る）。
 - 併せて「今日より前の日付」の空スタブ（中身なし）を削除する。
   当日ファイルはアクティブセッション／別プロジェクト並行作業と競合し得るため触らない。
 
-vault ルートは argv[1] → 環境変数の順で解決。フック定義から
-  args: ["${CLAUDE_PLUGIN_ROOT}/scripts/save_learnings.py", "${user_config.vault_root}"]
-のように渡す。解決できなければ何もせず終了（セッションを止めない）。
+vault ルートは argv[1] → 環境変数の順で解決。hooks.json は引数を渡さないため、通常は
+userConfig 由来の環境変数 CLAUDE_PLUGIN_OPTION_VAULT_ROOT で解決される。
+解決できなければ何もせず終了（セッションを止めない）。
 stdin からフック JSON（cwd を含む）を受け取る。
 """
-import json
-import re
 import sys
-from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import is_stub, resolve_vault  # noqa: E402
-
-# Claude Code は stdin へ UTF-8 で書くが、Windows の CPython は stdin をロケール既定
-# （日本語環境では cp932）で読む。固定しないと非 ASCII の cwd が化けて
-# `2026-08-27-MGMES02隗｣隱ｬ.md` のようなファイル名になり、cp932 にできないバイト列なら
-# 例外で cwd 自体を失って `-unknown.md` になる。
-try:
-    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
-
-DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
+from _vault import (  # noqa: E402
+    ensure_today_stub, is_before_today, is_stub, read_hook_cwd, read_text, resolve_vault,
+)
 
 
 def main() -> int:
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        data = {}
-    cwd = data.get("cwd", "")
-    project = Path(cwd).name if cwd else "unknown"
-    date = datetime.now().strftime("%Y-%m-%d")
+    cwd = read_hook_cwd()
 
     vault = resolve_vault()
     if vault is None:
@@ -53,11 +35,10 @@ def main() -> int:
     # --- 過去日の空スタブを掃除（当日は残す） ---
     try:
         for f in inbox.glob("*.md"):
-            m = DATE_RE.match(f.name)
-            if not m or m.group(1) >= date:
+            if not is_before_today(f.name):
                 continue
             try:
-                if f.stat().st_size == 0 or is_stub(f.read_text(encoding="utf-8")):
+                if f.stat().st_size == 0 or is_stub(read_text(f)):
                     f.unlink()
             except Exception:
                 pass
@@ -65,16 +46,7 @@ def main() -> int:
         pass
 
     # --- 当日スタブの確保 ---
-    outfile = inbox / f"{date}-{project}.md"
-    if not outfile.exists():
-        try:
-            with open(outfile, "w", encoding="utf-8") as f:
-                f.write(f"# {date} — {project}\n\n")
-                f.write(f"project: `{cwd}`\n\n")
-                f.write("## 学んだこと・解決したこと\n\n")
-                f.write("<!-- この下にClaude Codeが追記します -->\n\n")
-        except Exception:
-            pass
+    ensure_today_stub(vault, cwd)
     return 0
 
 

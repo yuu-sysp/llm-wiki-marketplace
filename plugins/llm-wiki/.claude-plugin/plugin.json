@@ -1,7 +1,7 @@
 {
   "name": "llm-wiki",
   "displayName": "LLM Wiki",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。蓄積方針を配布する SessionStart フック・当日足場を作る Stop フック・決定論的 lint・frontmatter からの index/keywords 自動生成・inbox 滞留の通知を備える。",
   "author": { "name": "yyasunobe" },
   "keywords": ["wiki", "knowledge-base", "obsidian", "llm-wiki"],

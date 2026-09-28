@@ -10,6 +10,8 @@
   指示になる。ここで出さないと Stop フック（save_learnings.py）が作る当日スタブを
   誰も埋めず、「自動蓄積」が空回りする。個人の ~/.claude/CLAUDE.md に方針を書く運用は
   特定PC依存になるため、プラグイン側から配る。
+- SessionStart フックとして走ったときは stdin の cwd から当日スタブも用意する
+  （Stop フックと同じ足場。最初のターンから追記先が存在するようにするため）。
 
 インストーラからも SessionStart フックからも同じこのスクリプトを呼ぶ（二重実装回避）。
 インストーラ実行時は方針出力が不要なので `--quiet-policy` で抑止する。
@@ -21,7 +23,9 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import pending_inbox, print_unresolved_hint, resolve_vault  # noqa: E402
+from _vault import (  # noqa: E402
+    ensure_today_stub, pending_inbox, print_unresolved_hint, read_hook_cwd, resolve_vault,
+)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -48,7 +52,12 @@ SEEDS = [
 ]
 
 
-def render(text: str) -> str:
+def render(tpl_name: str, text: str) -> str:
+    # ページ雛形（template-*.md）の {{DATE}} は「そのページを作る日」なので置換しない。
+    # ここで置換すると vault の雛形が初期化日で固定され、以後の新規ページの
+    # created / updated が全部その日になる。置換するのは index/log のような初期化時点の記録だけ。
+    if tpl_name.startswith("template-"):
+        return text
     return text.replace("{{DATE}}", TODAY)
 
 
@@ -56,8 +65,8 @@ def render(text: str) -> str:
 POLICY = """\
 == LLM Wiki 蓄積方針（llm-wiki プラグイン / SessionStart 注入）==
 vault: {vault}
-知見が出たら**セッション中にその場で** `{vault}/inbox/{date}-<プロジェクト名>.md` へ追記する。
-当日ファイルは Stop フックが用意するので新規作成は不要（既存に追記するだけ）。
+知見が出たら**セッション中にその場で** `{target}` へ追記する。
+当日ファイルはフックが用意する（無ければこの名前で作ってよい）。
 記録トリガー → 配置先:
   ライブラリ/クラス/API の使い方を調べた・エラー原因を特定した・同じパターンを2回以上書いた → concepts/
   設計判断をした（なぜAでなくBか。選択肢・理由・トレードオフ）→ notes/
@@ -96,9 +105,11 @@ def backlog_line(vault: Path):
         return None                      # 滞留表示のためにセッションを止めない
 
 
-def print_policy(vault: Path) -> None:
+def print_policy(vault: Path, stub=None) -> None:
     # 区切り文字を混在させない（`D:\x/inbox/` のような表示を避ける）
-    text = POLICY.format(vault=vault.as_posix(), date=TODAY)
+    target = (stub.as_posix() if stub is not None
+              else f"{vault.as_posix()}/inbox/{TODAY}-<プロジェクト名>.md")
+    text = POLICY.format(vault=vault.as_posix(), target=target)
     line = backlog_line(vault)
     if line:
         # 末尾の `==` の直前に差し込み、方針ブロックの中に収める
@@ -133,7 +144,7 @@ def main() -> int:
             skipped.append(dest_rel)
             continue
         tpl = TEMPLATES / tpl_name
-        content = render(tpl.read_text(encoding="utf-8")) if tpl.exists() else ""
+        content = render(tpl_name, tpl.read_text(encoding="utf-8")) if tpl.exists() else ""
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(content, encoding="utf-8")
         created.append(dest_rel)
@@ -147,7 +158,12 @@ def main() -> int:
 
     # 蓄積方針は毎回出す（これが無いと当日スタブが埋まらない）
     if not quiet_policy:
-        print_policy(vault)
+        # フックとして呼ばれたときだけ stdin に cwd が来る。その場で当日ファイルを用意し、
+        # 最初のターンから「既存に追記するだけ」が成り立つようにする（Stop だけだと
+        # 最初の応答が終わるまでファイルが無い）。
+        cwd = read_hook_cwd()
+        stub = ensure_today_stub(vault, cwd) if cwd else None
+        print_policy(vault, stub)
     return 0
 
 

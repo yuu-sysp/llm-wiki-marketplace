@@ -7,21 +7,24 @@ description: LLM Wiki の健全性を検査し索引を再生成する。赤リ�
 
 ## 手順
 
-1. 機械検査を実行:
-   ```
-   python "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"
-   ```
-   - exit 0 = 健全。1件以上あれば各項目（赤リンク/孤立/空/frontmatter/inbox）を提示する。
-2. 索引を再生成（`meta/index.md` と `meta/keywords.md` の両方が書き換わる）:
+1. 先に索引を再生成する（`meta/index.md` と `meta/keywords.md` の両方が書き換わる）:
    ```
    python "${CLAUDE_PLUGIN_ROOT}/scripts/index.py"
    ```
    - `index.md` … genre 別のページ一覧（frontmatter の `summary`）
    - `keywords.md` … 語 → ページの索引（frontmatter の `tags` ＋本文見出しの識別子）
-   - どちらも毎回全書き換え。**手で編集しても次回消える。**
+   - どちらも毎回作り直す。**手で編集しても次回消える。**
+   - lint は `index.md` のリンクも赤リンク検査するため、**古い index のまま lint すると
+     削除・改名済みページが赤リンクとして出る**。必ず index → lint の順で回す。
+2. 機械検査を実行:
+   ```
+   python "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"
+   ```
+   - exit 0 = 健全。1件以上あれば各項目（赤リンク/孤立/空/frontmatter/inbox）を提示する。
 3. 検出項目のうち **機械的に直せるもの**（赤リンクの [[]] 誤用→backtick化、孤立ページ→リンク追加）は
    直接修正してよい。**判断が要るもの**（矛盾・missing-page 新規作成の是非）は
    `_proposals/` に提案として残すか、ユーザーに確認する。
+   直したら 1 → 2 をもう一度回す。
 4. 意図的に残す赤リンク（将来ページ化予定）は `meta/lint-ignore.txt` に1行追加する。
 
 規約・判断基準は `${CLAUDE_PLUGIN_ROOT}/skills/_shared/references/` を参照。

@@ -10,7 +10,9 @@
                        index.md に載るのはページ名と summary だけなので、別名・略語・
                        エラーメッセージからページへ辿れない。query の grep 頼みを減らす。
 
-どちらも手書き禁止・毎回全書き換え（差分マージしない＝ドリフトしようがない）。
+どちらも手書き禁止・毎回全体を作り直す（差分マージしない＝ドリフトしようがない）。
+中身が前回と同じ（違うのが「最終更新」日付だけ）なら書き込まない。毎日日付だけの差分が
+出ると Obsidian 同期や git の履歴が汚れるため。
 
 vault ルートは argv[1] → 環境変数の順で解決。
   例: python index.py "D:/資料/LLM-Wiki"
@@ -21,7 +23,9 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _vault import print_unresolved_hint, resolve_vault  # noqa: E402
+from _vault import (  # noqa: E402
+    print_unresolved_hint, read_text, resolve_vault, split_frontmatter, strip_fences,
+)
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -55,23 +59,6 @@ ENUM_PREFIX_RE = re.compile(r"^(?:第?\d+[.)、章節]\s*)+")
 IDENT_HEAD_RE = re.compile(r"^[0-9A-Za-z]")
 JP_RE = re.compile(r"[ぁ-んァ-ヶ一-龥]")
 IDENT_MAX_JP = 2
-
-
-def read(p: Path) -> str:
-    try:
-        return p.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return p.read_text(encoding="cp932", errors="replace")
-
-
-def split_frontmatter(text: str):
-    """(frontmatterブロック, 本文) を返す。frontmatter が無ければ ("", text)。"""
-    if not text.lstrip().startswith("---"):
-        return "", text
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return "", text
-    return parts[1], parts[2]
 
 
 def parse_frontmatter(block: str) -> dict:
@@ -143,7 +130,8 @@ def collect(vault: Path):
         if not base.is_dir():
             continue
         for p in sorted(base.glob("*.md")):
-            fm_block, body = split_frontmatter(read(p))
+            fm_block, body = split_frontmatter(read_text(p))
+            fm_block = fm_block or ""
             fm = parse_frontmatter(fm_block)
             groups.setdefault(fm.get("genre") or "未分類", []).append(
                 (p.stem, fm.get("summary") or "")
@@ -154,7 +142,9 @@ def collect(vault: Path):
                 if len(t) >= KEYWORD_MIN_LEN:
                     tag_map.setdefault(t, set()).add(p.stem)
 
-            for raw in HEADING_RE.findall(body):
+            # コード例の `## コメント`（Python / PowerShell / bash）を見出しとして拾わない。
+            # インラインコードは消さない（見出しの `TENMST` 自体が拾いたい識別子のため）
+            for raw in HEADING_RE.findall(strip_fences(body)):
                 h = clean_heading(raw)
                 if is_identifier(h) and not h.isdigit():
                     head_map.setdefault(h, set()).add(p.stem)
@@ -229,6 +219,19 @@ def build_keywords(tag_map: dict, head_map: dict):
     return "\n".join(lines).rstrip() + "\n", len(tag_lines), len(head_lines)
 
 
+DATE_LINE_RE = re.compile(r"^最終更新: .*$", re.M)
+
+
+def write_if_changed(path: Path, text: str) -> bool:
+    """「最終更新」行以外が前回と同じなら書かない。書いたら True。"""
+    if path.exists():
+        old = read_text(path)
+        if DATE_LINE_RE.sub("", old) == DATE_LINE_RE.sub("", text):
+            return False
+    path.write_text(text, encoding="utf-8")
+    return True
+
+
 def main() -> int:
     vault = resolve_vault()
     if vault is None:
@@ -244,13 +247,13 @@ def main() -> int:
     meta.mkdir(parents=True, exist_ok=True)
 
     idx = meta / "index.md"
-    idx.write_text(build_index(groups), encoding="utf-8")
-    print(f"index.md を再生成しました: {idx}  （{total} ページ / {len(groups)} genre）")
+    done = "を再生成しました" if write_if_changed(idx, build_index(groups)) else "は変更なし"
+    print(f"index.md{done}: {idx}  （{total} ページ / {len(groups)} genre）")
 
     kw = meta / "keywords.md"
     text, n_tag, n_head = build_keywords(tag_map, head_map)
-    kw.write_text(text, encoding="utf-8")
-    print(f"keywords.md を再生成しました: {kw}  （tag {n_tag} 語 / 見出し {n_head} 語）")
+    done = "を再生成しました" if write_if_changed(kw, text) else "は変更なし"
+    print(f"keywords.md{done}: {kw}  （tag {n_tag} 語 / 見出し {n_head} 語）")
     return 0
 
 

@@ -9,13 +9,13 @@ Obsidian 上に知識を蓄積するハイブリッド LLM Wiki。現行運用�
 |---|---|---|
 | skill | `skills/{init,save,ingest,query,lint}` | ユーザー操作（`/llm-wiki:<name>`） |
 | skill参照 | `skills/_shared/references/` | 記述規約・判断基準 |
-| hook | `hooks/hooks.json` | SessionStart=bootstrap(足場冪等生成＋**蓄積方針の注入**＋inbox滞留の通知) / Stop=save_learnings(当日スタブ確保＋空スタブ掃除) |
-| script | `scripts/lint.py` | 決定論的 lint（赤リンク/孤立/空/frontmatter/inbox） |
+| hook | `hooks/hooks.json` | SessionStart=bootstrap(足場冪等生成＋**蓄積方針の注入**＋当日スタブ確保＋inbox滞留の通知) / Stop=save_learnings(当日スタブ確保＋空スタブ掃除) |
+| script | `scripts/lint.py` | 決定論的 lint（赤リンク/孤立/空/frontmatter/inbox）。コード内の `[[ ]]` は対象外・`![[添付]]` は実在確認・ページ名は大文字小文字を区別しない |
 | script | `scripts/index.py` | `meta/index.md`（genre別一覧）と `meta/keywords.md`（語→ページ索引）を自動生成 |
 | script | `scripts/bootstrap.py` | vault フォルダ構成＋meta雛形の冪等生成／SessionStart で蓄積方針を出力（`--quiet-policy` で抑止） |
 | script | `scripts/convert_inbox.py` | inbox の pptx/xlsx/docx/pdf/txt 等を md 化（原本は `sources/_attachments/` へ退避） |
 | script | `scripts/save_learnings.py` | Stop フック本体 |
-| script | `scripts/_vault.py` | vault ルート解決（引数→環境変数）と inbox のスタブ／未処理判定 |
+| script | `scripts/_vault.py` | vault ルート解決（引数→環境変数）・inbox のスタブ／未処理判定・当日スタブ生成・frontmatter 分割・コード除去の共通処理 |
 | template | `templates/` | ページ・meta の雛形 |
 
 ## 依存
@@ -44,14 +44,14 @@ python scripts/lint.py          "D:/資料/LLM-Wiki"
 python scripts/index.py         "D:/資料/LLM-Wiki"
 ```
 
-## 自動蓄積の仕組み（v0.2）
+## 自動蓄積の仕組み
 
 「自動蓄積」は 2 つの部品の組み合わせで成立する。**片方だけでは空回りする。**
 
 | 部品 | 役割 |
 |---|---|
 | Stop フック `save_learnings.py` | 当日 `inbox/{日付}-{プロジェクト}.md` の**空の足場**を用意（＋過去日の空スタブ掃除） |
-| SessionStart フック `bootstrap.py` | 「いつ・何を・どこへ書くか」の**蓄積方針を stdout でセッション context に注入** |
+| SessionStart フック `bootstrap.py` | 「いつ・何を・どこへ書くか」の**蓄積方針を stdout でセッション context に注入**。同じ当日足場もここで用意し、方針には実ファイル名を出す（Stop だけだと最初の応答が終わるまで追記先が無い） |
 
 v0.1 では方針が各利用者の `~/.claude/CLAUDE.md` にしか無く、新規インストールでは
 **毎日空のスタブが生成されるだけで誰も埋めない**状態だった。v0.2 でプラグイン側から配るようにした。
@@ -100,5 +100,9 @@ inbox: 未処理 14件（最古 39日前: 2026-08-07-MGMESTEST.md）→ /llm-wik
 ## 設計メモ
 
 - **提案ワークフロー** `_proposals/`（pending→applied/rejected）と **curiosity** は設計として想定済み。
-  v0.2 では skill 化していない（将来拡張）。
+  現時点では skill 化していない（将来拡張）。
 - 既存 vault の frontmatter 一括移行は本プラグインの範囲外（空 vault の新規配布が対象）。
+- vault の `meta/template-*.md` は `{{DATE}}` を置換せずに配置する（ページ作成時に置き換える）。
+  v0.4.0 以前に初期化した vault は雛形の日付が初期化日で固定されているので、
+  `meta/template-*.md` を削除して `/llm-wiki:init` を実行すると作り直せる。
+- `index.py` は中身が前回と同じ（「最終更新」日付だけ違う）なら書き込まない。

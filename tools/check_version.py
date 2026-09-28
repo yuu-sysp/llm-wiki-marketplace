@@ -9,10 +9,13 @@ publish.bat から呼び、次の 2 つを機械的に検査する。
   1. plugins/llm-wiki/.claude-plugin/plugin.json と .claude-plugin/marketplace.json の
      version が一致していること（宣言が2箇所あるためドリフトしやすい）
   2. plugins/ 配下に発行済み（origin/master）との差分があるなら version が上がっていること
+  3. 配布用手順書 docs/install-guide.html に書いた版表記（`<span>vX.Y.Z</span>`）が一致していること
+     （v0.4.0 発行時に v0.3.0 のまま配られていた）
 
 終了コード: 0 = 発行してよい / 1 = 問題あり
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +23,8 @@ from pathlib import Path
 PLUGIN_JSON = "plugins/llm-wiki/.claude-plugin/plugin.json"
 MARKET_JSON = ".claude-plugin/marketplace.json"
 PLUGIN_DIR = "plugins"
+GUIDE_HTML = "docs/install-guide.html"
+GUIDE_VERSION_RE = re.compile(r"<span>v(\d+\.\d+\.\d+)</span>")
 
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -57,6 +62,15 @@ def main() -> int:
         print(f"       {MARKET_JSON} = {market_v}")
         print("     両方を同じ値に揃えてから発行してください。")
         return 1
+
+    guide = root / GUIDE_HTML
+    if guide.exists():
+        shown = GUIDE_VERSION_RE.findall(guide.read_text(encoding="utf-8"))
+        stale = sorted(set(v for v in shown if v != plugin_v))
+        if stale:
+            print(f"[NG] {GUIDE_HTML} の版表記が古いままです: v{', v'.join(stale)}（現行 {plugin_v}）")
+            print(f"     <span>v{plugin_v}</span> に書き換えてから発行してください。")
+            return 1
 
     code, published = git(root, "show", "origin/master:" + PLUGIN_JSON)
     if code != 0:

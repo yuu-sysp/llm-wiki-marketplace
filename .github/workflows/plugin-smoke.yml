@@ -64,12 +64,12 @@ jobs:
           EOF
           # index.md は全ページを列挙する。これで孤立が消えないことを確かめる。
           python plugins/llm-wiki/scripts/index.py "$VAULT"
-          python plugins/llm-wiki/scripts/lint.py "$VAULT" > lint.out || true
-          cat lint.out
-          if ! grep -q "concepts/C.md" lint.out; then
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > "$RUNNER_TEMP/lint.out" || true
+          cat "$RUNNER_TEMP/lint.out"
+          if ! grep -q "concepts/C.md" "$RUNNER_TEMP/lint.out"; then
             echo "NG: 孤立ページ C を検出できていない"; exit 1
           fi
-          if grep -q "concepts/B.md" lint.out; then
+          if grep -q "concepts/B.md" "$RUNNER_TEMP/lint.out"; then
             echo "NG: 被リンクありの B を孤立と誤検出"; exit 1
           fi
           echo "OK: 孤立検出は index.md に打ち消されていない"
@@ -87,9 +87,9 @@ jobs:
           ---
           # D
           EOF
-          python plugins/llm-wiki/scripts/lint.py "$VAULT" > fm.out || true
-          cat fm.out
-          if ! grep -q "欠落: type:" fm.out; then
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > "$RUNNER_TEMP/fm.out" || true
+          cat "$RUNNER_TEMP/fm.out"
+          if ! grep -q "欠落: type:" "$RUNNER_TEMP/fm.out"; then
             echo "NG: doctype: が type: として通ってしまった"; exit 1
           fi
           echo "OK: 行頭一致で判定できている"
@@ -139,8 +139,8 @@ jobs:
           EOF
           # keywords.md も全ページを列挙するので、lint の走査に混ざると孤立が消える
           python plugins/llm-wiki/scripts/index.py "$VAULT"
-          python plugins/llm-wiki/scripts/lint.py "$VAULT" > kw.out || true
-          if ! grep -q "concepts/Lonely.md" kw.out; then
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > "$RUNNER_TEMP/kw.out" || true
+          if ! grep -q "concepts/Lonely.md" "$RUNNER_TEMP/kw.out"; then
             echo "NG: keywords.md が孤立ページ検出を打ち消している"; exit 1
           fi
           echo "OK: 孤立検出は keywords.md の影響を受けていない"
@@ -158,9 +158,9 @@ jobs:
 
           <!-- ここに追記 -->
           EOF
-          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" > q.out
-          if grep -q '^inbox:' q.out; then
-            echo "NG: 空スタブだけで催促している"; cat q.out; exit 1
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" < /dev/null > "$RUNNER_TEMP/q.out"
+          if grep -q '^inbox:' "$RUNNER_TEMP/q.out"; then
+            echo "NG: 空スタブだけで催促している"; cat "$RUNNER_TEMP/q.out"; exit 1
           fi
           # 中身ありが 3 件そろったら出る
           for n in a b c; do
@@ -170,17 +170,87 @@ jobs:
           実際の内容がある
           EOF
           done
-          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" > l.out
-          cat l.out
-          if ! grep -q '^inbox: 未処理 3件' l.out; then
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" < /dev/null > "$RUNNER_TEMP/l.out"
+          cat "$RUNNER_TEMP/l.out"
+          if ! grep -q '^inbox: 未処理 3件' "$RUNNER_TEMP/l.out"; then
             echo "NG: 滞留 3 件を報告していない"; exit 1
           fi
-          if ! grep -q 'llm-wiki:ingest' l.out; then
+          if ! grep -q 'llm-wiki:ingest' "$RUNNER_TEMP/l.out"; then
             echo "NG: 対処コマンドを案内していない"; exit 1
           fi
           # インストーラ経路（--quiet-policy）では出さない
-          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy > i.out
-          if grep -q '^inbox:' i.out; then
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy > "$RUNNER_TEMP/i.out"
+          if grep -q '^inbox:' "$RUNNER_TEMP/i.out"; then
             echo "NG: --quiet-policy でも催促が出ている"; exit 1
           fi
           echo "OK: 閾値と --quiet-policy が効いている"
+
+      - name: コードブロック内の [[ ]]・添付の埋め込み・大文字小文字違いを赤リンクにしない
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-code"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          mkdir -p "$VAULT/sources/_attachments"
+          echo png > "$VAULT/sources/_attachments/diagram.png"
+          cat > "$VAULT/concepts/A.md" <<'EOF'
+          ---
+          type: concept
+          created: 2026-01-01
+          ---
+          # A
+          ![[diagram.png]]
+          インラインの `a[[0]]` もリンクではない
+          ```bash
+          if [[ -f x ]]; then echo; fi
+          ## comment in code
+          ```
+          [[b]] は B.md を指す（Obsidian は大文字小文字を区別しない）
+          ![[missing.png]]
+          EOF
+          cat > "$VAULT/concepts/B.md" <<'EOF'
+          ---
+          type: concept
+          created: 2026-01-01
+          ---
+          # B
+          [[A]]
+          EOF
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          python plugins/llm-wiki/scripts/lint.py "$VAULT" > "$RUNNER_TEMP/code.out" || true
+          cat "$RUNNER_TEMP/code.out"
+          if grep -q -- '-f x' "$RUNNER_TEMP/code.out"; then echo "NG: フェンス内の [[ ]] を拾った"; exit 1; fi
+          if grep -q '^  - 0 ' "$RUNNER_TEMP/code.out"; then echo "NG: インラインコード内の [[ ]] を拾った"; exit 1; fi
+          if grep -q 'diagram.png' "$RUNNER_TEMP/code.out"; then echo "NG: 実在する添付を赤リンクにした"; exit 1; fi
+          if ! grep -q 'missing.png' "$RUNNER_TEMP/code.out"; then echo "NG: 存在しない添付を見逃した"; exit 1; fi
+          if grep -q 'concepts/B.md' "$RUNNER_TEMP/code.out"; then echo "NG: [[b]] で B が孤立扱い"; exit 1; fi
+          if grep -q 'comment in code' "$VAULT/meta/keywords.md"; then echo "NG: コード内の ## を見出しにした"; exit 1; fi
+          echo "OK: コード・埋め込み・大文字小文字の扱いが正しい"
+
+      - name: vault の雛形は {{DATE}} を保ち、index は日付だけの差分で書き換えない
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-tpl"
+          python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" --quiet-policy
+          if ! grep -q '^created: {{DATE}}' "$VAULT/meta/template-concept.md"; then
+            echo "NG: 雛形の日付が初期化日で固定された"; exit 1
+          fi
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          sed -i 's/^最終更新: .*/最終更新: 2000-01-01/' "$VAULT/meta/index.md"
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          if ! grep -q '^最終更新: 2000-01-01' "$VAULT/meta/index.md"; then
+            echo "NG: 中身が同じなのに index.md を書き換えた"; exit 1
+          fi
+          echo "OK: 雛形の日付と index の無変更スキップが効いている"
+
+      - name: SessionStart の時点で当日ファイルができる
+        run: |
+          VAULT="${RUNNER_TEMP}/vault-stub"
+          TODAY=$(date +%F)
+          echo '{"cwd": "/work/myproj"}' | python plugins/llm-wiki/scripts/bootstrap.py "$VAULT" > "$RUNNER_TEMP/stub.out"
+          cat "$RUNNER_TEMP/stub.out"
+          if [ ! -f "$VAULT/inbox/$TODAY-myproj.md" ]; then echo "NG: 当日ファイルが無い"; exit 1; fi
+          if ! grep -q "inbox/$TODAY-myproj.md" "$RUNNER_TEMP/stub.out"; then
+            echo "NG: 方針に実ファイル名が出ていない"; exit 1
+          fi
+          # 当日の空スタブは lint の失敗に数えない
+          python plugins/llm-wiki/scripts/index.py "$VAULT"
+          python plugins/llm-wiki/scripts/lint.py "$VAULT"
+          echo "OK: 最初のターンから追記先がある"

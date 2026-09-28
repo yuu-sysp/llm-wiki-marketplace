@@ -55,21 +55,107 @@ def read_text(p: Path) -> str:
         return p.read_text(encoding="cp932", errors="replace")
 
 
+def split_frontmatter(text: str):
+    """(frontmatterブロック, 本文) を返す。frontmatter が無ければ (None, text)。
+
+    lint（必須キー判定）・index（genre/summary/tags）・inbox 判定で同じ切り方をしないと、
+    同じページが片方では frontmatter あり、片方ではなしに見える。
+    """
+    if not text.lstrip().startswith("---"):
+        return None, text
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return None, text
+    return parts[1], parts[2]
+
+
+FENCE_RE = re.compile(r"^[ \t]*(```|~~~).*?^[ \t]*\1[^\n]*$", re.M | re.S)
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
+
+
+def strip_fences(text: str) -> str:
+    """フェンスコード（``` / ~~~）を消す（行数は保つ）。
+
+    規約はコード例を含めるよう求めるため、bash の `[[ -f x ]]` や Python の `## コメント` が
+    本文に普通に出る。これをリンクや見出しとして拾うと赤リンク・索引ノイズになる。
+    """
+    return FENCE_RE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+
+
+def strip_code(text: str) -> str:
+    """フェンスコードとインラインコードを消す（リンク走査用）。"""
+    return INLINE_CODE_RE.sub("", strip_fences(text))
+
+
 def is_stub(text: str) -> bool:
     """frontmatter・見出し・project行・HTMLコメント・空行だけなら中身なしスタブ。
 
     Stop フックが毎日作る当日の足場がこれ。誰も追記しなければスタブのまま残る。
     """
-    body = text
-    if body.lstrip().startswith("---"):
-        parts = body.split("---", 2)
-        if len(parts) == 3:
-            body = parts[2]
+    _, body = split_frontmatter(text)
     body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
     lines = [ln for ln in body.splitlines()
              if ln.strip() and not ln.lstrip().startswith("#")
              and not ln.strip().startswith("project:")]
     return len(lines) == 0
+
+
+def today() -> str:
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def is_before_today(name: str) -> bool:
+    """ファイル名の日付プレフィックスが今日より前か（プレフィックス無しは False）。"""
+    m = DATE_PREFIX_RE.match(name)
+    return bool(m) and m.group(1) < today()
+
+
+def read_hook_cwd() -> str:
+    """フックの stdin JSON から cwd を取る。取れなければ ""。
+
+    Claude Code は stdin へ UTF-8 で書くが、Windows の CPython は stdin をロケール既定
+    （日本語環境では cp932）で読む。固定しないと非 ASCII の cwd が化けて
+    `2026-08-27-MGMES02隗｣隱ｬ.md` のようなファイル名になり、cp932 にできないバイト列なら
+    例外で cwd 自体を失って `-unknown.md` になる。
+    端末から手で実行したときは stdin を待たない（固まるため）。
+    """
+    try:
+        if sys.stdin is None or sys.stdin.isatty():
+            return ""
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    try:
+        import json
+        data = json.load(sys.stdin)
+        return data.get("cwd", "") if isinstance(data, dict) else ""
+    except Exception:
+        return ""
+
+
+def ensure_today_stub(vault: Path, cwd: str):
+    """当日 `inbox/{date}-{project}.md` の足場を用意し、そのパスを返す（失敗時 None）。
+
+    SessionStart と Stop の両方から呼ぶ。Stop だけだと最初の応答が終わるまでファイルが無く、
+    「既存に追記するだけ」という蓄積方針と食い違う。既存ファイルには触らない。
+    """
+    project = Path(cwd).name if cwd else "unknown"
+    date = today()
+    inbox = vault / "inbox"
+    outfile = inbox / f"{date}-{project}.md"
+    try:
+        inbox.mkdir(parents=True, exist_ok=True)
+        if not outfile.exists():
+            with open(outfile, "x", encoding="utf-8") as f:     # 並行セッションとの競合は x で弾く
+                f.write(f"# {date} — {project}\n\n")
+                f.write(f"project: `{cwd}`\n\n")
+                f.write("## 学んだこと・解決したこと\n\n")
+                f.write("<!-- この下にClaude Codeが追記します -->\n\n")
+    except FileExistsError:
+        pass
+    except Exception:
+        return None
+    return outfile
 
 
 def pending_inbox(vault: Path) -> list:
